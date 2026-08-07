@@ -159,6 +159,7 @@ export class GoogleConnectionService {
 	}
 
 	async suppressDomain(
+		organizationId: string,
 		domain: string,
 		options: { reason?: string; purge: boolean },
 	): Promise<{ domain: string; purged: number }> {
@@ -167,7 +168,7 @@ export class GoogleConnectionService {
 			throw new NotFoundException(`"${domain}" is not a domain.`);
 		}
 
-		const ours = await this.match.internalIdentity();
+		const ours = await this.match.internalIdentity(organizationId);
 		if (ours.domains.has(normalised)) {
 			throw new NotFoundException(
 				"That is our own domain — it is already excluded.",
@@ -176,22 +177,24 @@ export class GoogleConnectionService {
 
 		await this.db.suppressedDomain.upsert({
 			where: { domain: normalised },
-			create: { domain: normalised, reason: options.reason ?? null },
+			create: { organizationId, domain: normalised, reason: options.reason ?? null },
 			update: { reason: options.reason ?? null },
 		});
 
 		if (!options.purge) return { domain: normalised, purged: 0 };
 
-		const company = await this.db.company.findUnique({
-			where: { domain: normalised },
+		const companies = await this.db.company.findMany({
+			where: { organizationId, domain: normalised },
 			select: { id: true },
 		});
 
-		if (!company) return { domain: normalised, purged: 0 };
+		if (companies.length === 0) return { domain: normalised, purged: 0 };
+
+		const companyIds = companies.map((c) => c.id);
 
 		const [threads, events] = await this.db.$transaction([
-			this.db.emailThread.deleteMany({ where: { companyId: company.id } }),
-			this.db.calendarEvent.deleteMany({ where: { companyId: company.id } }),
+			this.db.emailThread.deleteMany({ where: { companyId: { in: companyIds } } }),
+			this.db.calendarEvent.deleteMany({ where: { companyId: { in: companyIds } } }),
 		]);
 
 		await this.stamp.recomputeAll();

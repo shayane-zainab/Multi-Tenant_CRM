@@ -253,7 +253,7 @@ export class CompaniesService {
 			enrichedAt: enrichedAt?.toISOString() ?? null,
 			primaryContactId: primaryContact?.id ?? null,
 			primaryContact,
-			reportingCurrency: await this.conversion.reportingCurrency(),
+			reportingCurrency: await this.conversion.reportingCurrency(organizationId),
 			deals: deals.map((deal) => ({
 				...deal,
 				amount: undefined,
@@ -267,7 +267,7 @@ export class CompaniesService {
 
 	async options(organizationId: string, q: string) {
 		return this.db.company.findMany({
-			where: this.buildWhere(organizationId, { q, owner: FACET_ALL, industry: FACET_ALL, enrichment: FACET_ALL, source: FACET_ALL }),
+			where: this.buildWhere(organizationId, { q, owner: FACET_ALL, industry: FACET_ALL, enrichment: FACET_ALL, source: FACET_ALL } as any),
 			select: { id: true, name: true, domain: true, iconUrl: true },
 			orderBy: { name: "asc" },
 			take: 100,

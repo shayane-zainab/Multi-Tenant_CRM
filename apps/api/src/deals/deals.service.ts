@@ -95,7 +95,7 @@ export class DealsService {
 		const { skip, take } = paginate(input);
 
 		const openWhere = { ...where, stage: { in: [...OPEN_DEAL_STAGES] } };
-		const base = await this.conversion.reportingCurrency();
+		const base = await this.conversion.reportingCurrency(organizationId);
 
 		const [rows, total, facetCounts, openValue, unconverted] =
 			await Promise.all([
@@ -125,7 +125,7 @@ export class DealsService {
 					where: { AND: [openWhere, this.conversion.countedWhere(base)] },
 					_sum: { baseAmount: true },
 				}),
-				this.conversion.unconverted(openWhere),
+				this.conversion.unconverted(organizationId, openWhere),
 			]);
 
 		return {
@@ -209,7 +209,7 @@ export class DealsService {
 			...rest,
 			amountCents: toCents(amount),
 			baseAmountCents: toCents(baseAmount),
-			reportingCurrency: await this.conversion.reportingCurrency(),
+			reportingCurrency: await this.conversion.reportingCurrency(organizationId),
 			fxRate: fxRate?.toNumber() ?? null,
 			fxRateAt: fxRateAt?.toISOString() ?? null,
 			stageChangedAt: deal.stageChangedAt.toISOString(),
@@ -226,9 +226,10 @@ export class DealsService {
 		const now = new Date();
 
 		const currency = normalizeCurrency(
-			input.currency ?? (await this.conversion.reportingCurrency()),
+			input.currency ?? (await this.conversion.reportingCurrency(organizationId)),
 		);
 		const fx = await this.conversion.dealFields(
+			organizationId,
 			decimalFromCents(input.amountCents),
 			currency,
 		);
@@ -302,7 +303,7 @@ export class DealsService {
 					? normalizeCurrency(input.currency)
 					: normalizeCurrency(current.currency);
 
-			Object.assign(data, await this.conversion.dealFields(amount, currency));
+			Object.assign(data, await this.conversion.dealFields(organizationId, amount, currency));
 		}
 
 		try {

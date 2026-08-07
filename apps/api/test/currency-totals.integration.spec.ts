@@ -58,7 +58,7 @@ async function pipelineCents(): Promise<number> {
 
 beforeAll(async () => {
 	const existing = await db.orgSetting.findUnique({
-		where: { id: SETTINGS_ID },
+		where: { organizationId: orgId },
 		select: { reportingCurrency: true },
 	});
 	previousReportingCurrency = existing?.reportingCurrency ?? null;
@@ -79,7 +79,7 @@ beforeAll(async () => {
 	});
 
 	const company = await db.company.upsert({
-		where: { domain: { organizationId: orgId, domain } },
+		where: { organizationId_domain: { organizationId: orgId, domain } },
 		create: { organizationId: orgId, name: `Money Co ${suffix}`, domain },
 		update: {},
 		select: { id: true },
@@ -91,7 +91,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await db.deal.deleteMany({ where: { companyId } });
-	await db.company.deleteMany({ where: { domain: { organizationId: orgId, domain } } });
+	await db.company.deleteMany({ where: { organizationId: orgId, domain } });
 	await db.user.deleteMany({ where: { id: userId } });
 	await clearRates();
 
@@ -101,7 +101,7 @@ afterAll(async () => {
 		await db.orgSetting.updateMany({ data: { organizationId: orgId, reportingCurrency: null } });
 	}
 
-	await conversion.rerateAll();
+	await conversion.rerateAll(orgId);
 });
 
 describe("a total across currencies", () => {
@@ -159,7 +159,7 @@ describe("a total across currencies", () => {
 	it("picks the waiting deal up when a rate finally arrives", async () => {
 		await rate("CHF", "1.25", RateSource.MANUAL);
 
-		const filled = await conversion.fillMissing();
+		const filled = await conversion.fillMissing(orgId);
 		expect(filled.converted).toBeGreaterThan(0);
 
 		expect(await pipelineCents()).toBe(
@@ -173,7 +173,7 @@ describe("a total across currencies", () => {
 	it("does not re-rate a deal that already has a rate", async () => {
 		await rate("EUR", "9.99", RateSource.FETCHED);
 
-		await conversion.fillMissing();
+		await conversion.fillMissing(orgId);
 
 		const row = await db.deal.findFirst({
 			where: { companyId, currency: "EUR" },
@@ -186,7 +186,7 @@ describe("a total across currencies", () => {
 	it("lets a rate entered by hand beat the fetched one on a re-rate", async () => {
 		await rate("EUR", "1.50", RateSource.MANUAL);
 
-		await conversion.rerateAll();
+		await conversion.rerateAll(orgId);
 
 		const row = await db.deal.findFirst({
 			where: { companyId, currency: "EUR" },
@@ -200,7 +200,7 @@ describe("a total across currencies", () => {
 	it("re-rates everything when the reporting currency changes", async () => {
 		await writeReportingCurrency(db, orgId, "EUR");
 
-		const rerated = await conversion.rerateAll();
+		const rerated = await conversion.rerateAll(orgId);
 		expect(rerated.missing).toContain("USD");
 
 		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
@@ -214,7 +214,7 @@ describe("a total across currencies", () => {
 describe("the deals list", () => {
 	it("reports its open pipeline in the reporting currency and discloses the rest", async () => {
 		await writeReportingCurrency(db, orgId, "USD");
-		await conversion.rerateAll();
+		await conversion.rerateAll(orgId);
 
 		const list = await deals.list(orgId, {
 			q: "",
@@ -242,7 +242,7 @@ describe("the deals list", () => {
 describe("a converted figure knows which currency it is in", () => {
 	it("leaves a deal whose baseAmount predates a currency change out of totals", async () => {
 		await writeReportingCurrency(db, orgId, "USD");
-		await conversion.rerateAll();
+		await conversion.rerateAll(orgId);
 
 		const before = await pipelineCents();
 		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
@@ -268,7 +268,7 @@ describe("a converted figure knows which currency it is in", () => {
 		const stale = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(stale.unconverted.count).toBe(1);
 
-		const filled = await conversion.fillMissing();
+		const filled = await conversion.fillMissing(orgId);
 		expect(filled.converted).toBeGreaterThan(0);
 
 		expect(await pipelineCents()).toBe(before + MILLION);
@@ -278,7 +278,7 @@ describe("a converted figure knows which currency it is in", () => {
 
 	it("never lets a converted figure with no currency on it go unnoticed", async () => {
 		await writeReportingCurrency(db, orgId, "USD");
-		await conversion.rerateAll();
+		await conversion.rerateAll(orgId);
 
 		const before = await pipelineCents();
 
@@ -301,7 +301,7 @@ describe("a converted figure knows which currency it is in", () => {
 		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(summary.unconverted.count).toBe(1);
 
-		await conversion.fillMissing();
+		await conversion.fillMissing(orgId);
 
 		const healed = await db.deal.findUnique({
 			where: { id: orphan.id },
@@ -329,12 +329,12 @@ describe("a converted figure knows which currency it is in", () => {
 			),
 		);
 
-		const pending = await conversion.unconverted();
+		const pending = await conversion.unconverted(orgId);
 		expect(pending.currencies.filter((code) => code === "USD")).toEqual([
 			"USD",
 		]);
 
-		const rerated = await conversion.rerateAll();
+		const rerated = await conversion.rerateAll(orgId);
 
 		const written = await db.deal.findMany({
 			where: { id: { in: rows.map((row) => row.id) } },
@@ -367,7 +367,7 @@ describe("a converted figure knows which currency it is in", () => {
 
 	it("keeps a converted deal when the rate behind it has gone away", async () => {
 		await writeReportingCurrency(db, orgId, "USD");
-		await conversion.rerateAll();
+		await conversion.rerateAll(orgId);
 
 		const deal = await deals.create(orgId, {
 			name: `Frozen ${suffix}`,
@@ -398,7 +398,7 @@ describe("a converted figure knows which currency it is in", () => {
 			select: { id: true },
 		});
 
-		const filled = await conversion.fillMissing();
+		const filled = await conversion.fillMissing(orgId);
 		expect(filled.missing).toContain("EUR");
 		expect(filled.cleared).toBe(0);
 

@@ -38,11 +38,18 @@ export class SyncStateService {
 		source: SyncSource,
 		options: { autoCreate: boolean },
 	): Promise<MailboxSync> {
+		const member = await this.db.member.findFirst({
+			where: { userId },
+			select: { organizationId: true },
+		});
+		if (!member) throw new Error("User has no organization");
+
 		return this.db.mailboxSync.upsert({
 			where: { userId_source: { userId, source } },
 			create: {
 				userId,
 				source,
+				organizationId: member.organizationId,
 				status: GoogleSyncStatus.IDLE,
 				autoCreate: options.autoCreate,
 			},

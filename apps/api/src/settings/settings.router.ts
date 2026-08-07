@@ -1,7 +1,8 @@
 import { Inject } from "@nestjs/common";
 import { Ctx, Input, Mutation, Query, Router, UseMiddlewares } from "nestjs-trpc";
 import type { z } from "zod";
-import { AuthMiddleware, type AuthedTrpcContext } from "../trpc/middlewares/auth.middleware";
+import type { AuthedTrpcContext } from "../trpc/context.types";
+import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { setAgentModelInput, setResearchKeyInput } from "./settings.contracts";
 import { SettingsService } from "./settings.service";
 

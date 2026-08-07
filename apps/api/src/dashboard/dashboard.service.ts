@@ -53,7 +53,7 @@ export class DashboardService {
 		const trendStart = monthStart(now, -(TREND_MONTHS - 1));
 		const rateStart = new Date(now.getTime() - RATE_WINDOW_DAYS * DAY_MS);
 
-		const base = await this.conversion.reportingCurrency();
+		const base = await this.conversion.reportingCurrency(organizationId);
 		const counted = this.conversion.countedWhere(base);
 
 		const [
@@ -173,7 +173,7 @@ export class DashboardService {
 					deal: { select: { id: true, name: true } },
 				},
 			}),
-			this.conversion.unconverted(owned),
+			this.conversion.unconverted(organizationId, owned),
 		]);
 
 		const stages = OPEN_DEAL_STAGES.map((stage) => {

@@ -18,12 +18,13 @@ export class EnrichmentLogService {
 		private readonly stamp: ActivityStampService,
 	) {}
 
-	async record(event: EnrichmentEvent): Promise<string | null> {
+	async record(organizationId: string, event: EnrichmentEvent): Promise<string | null> {
 		const author = await this.authorFor(event);
 		if (!author) return null;
 
 		const activity = await this.db.activity.create({
 			data: {
+				organizationId,
 				type: ActivityType.ENRICHMENT,
 				subject: event.subject,
 				body: event.body ?? null,

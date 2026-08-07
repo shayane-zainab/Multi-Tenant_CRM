@@ -55,12 +55,12 @@ export class RatesService {
 
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async refreshedAt(): Promise<Date | null> {
-		return readRatesRefreshedAt(this.db);
+	async refreshedAt(organizationId: string): Promise<Date | null> {
+		return readRatesRefreshedAt(this.db, organizationId);
 	}
 
-	async refresh(): Promise<RateRefresh> {
-		const base = await readReportingCurrency(this.db);
+	async refresh(organizationId: string): Promise<RateRefresh> {
+		const base = await readReportingCurrency(this.db, organizationId);
 		const quotes = await this.fetch(base);
 
 		if (!quotes) {
@@ -75,7 +75,7 @@ export class RatesService {
 
 		const written = await this.store(base, quotes.rates, quotes.asOf);
 
-		await writeRatesRefreshedAt(this.db, new Date());
+		await writeRatesRefreshedAt(this.db, organizationId, new Date());
 
 		this.logger.log({
 			message: "Exchange rates refreshed",

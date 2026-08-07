@@ -237,7 +237,7 @@ export class ContactsService {
 		return {
 			...rest,
 			company,
-			queued: await this.queue.isQueued({ contactId: id }),
+			queued: await this.queue.isQueued(organizationId, { contactId: id }),
 			createdAt: createdAt.toISOString(),
 			brief: brief
 				? {
@@ -358,6 +358,7 @@ export class ContactsService {
 					await tx.suppressedContact.upsert({
 						where: { email: suppress },
 						create: {
+							organizationId,
 							email: suppress,
 							reason: `Deleted from the CRM (${name})`,
 						},

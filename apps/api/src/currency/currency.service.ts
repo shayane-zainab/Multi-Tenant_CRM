@@ -73,8 +73,8 @@ export class CurrencyService {
 					provider: true,
 				},
 			}),
-			this.rates.refreshedAt(),
-			this.conversion.unconverted(),
+			this.rates.refreshedAt(organizationId),
+			this.conversion.unconverted(organizationId),
 			this.db.deal.groupBy({
 				by: ["currency"],
 				where: { amount: { not: null } },
@@ -169,10 +169,10 @@ export class CurrencyService {
 
 		if (currency === current) return this.settings(organizationId, actingUserId);
 
-		await writeReportingCurrency(this.db, currency);
+		await writeReportingCurrency(this.db, organizationId, currency);
 
-		const refresh = await this.rates.refresh();
-		const rerated = await this.conversion.rerateAll();
+		const refresh = await this.rates.refresh(organizationId);
+		const rerated = await this.conversion.rerateAll(organizationId);
 
 		this.logger.log({
 			message: "Reporting currency changed",
@@ -224,7 +224,7 @@ export class CurrencyService {
 			update: { rate: new Prisma.Decimal(rate), asOf },
 		});
 
-		const filled = await this.conversion.fillMissing();
+		const filled = await this.conversion.fillMissing(organizationId);
 
 		this.logger.log({
 			message: "Manual exchange rate saved",
@@ -262,13 +262,13 @@ export class CurrencyService {
 	async refresh(organizationId: string, actingUserId: string): Promise<CurrencySettings> {
 		await this.requireManager(organizationId, actingUserId);
 
-		const refresh = await this.rates.refresh();
+		const refresh = await this.rates.refresh(organizationId);
 
 		if (!refresh.ok) {
 			throw new BadRequestException(refresh.reason ?? "Could not fetch rates.");
 		}
 
-		await this.conversion.fillMissing();
+		await this.conversion.fillMissing(organizationId);
 
 		return this.settings(organizationId, actingUserId);
 	}

@@ -280,7 +280,7 @@ export class CalendarSyncService {
 			select: { id: true },
 		});
 
-		await this.syncAttendees(record.id, event);
+		await this.syncAttendees(row.organizationId, record.id, event);
 		await this.prepareForMeeting(row.organizationId, record.id, start.at);
 		await this.project(row.organizationId, record.id, row.userId, {
 			title: event.summary ?? "Meeting",
@@ -294,6 +294,7 @@ export class CalendarSyncService {
 	}
 
 	private async syncAttendees(
+		organizationId: string,
 		eventId: string,
 		event: GoogleEvent,
 	): Promise<void> {
@@ -311,7 +312,7 @@ export class CalendarSyncService {
 		);
 
 		const contacts = await this.db.contact.findMany({
-			where: { organizationId: row.organizationId, email: { in: emails } },
+			where: { organizationId, email: { in: emails } },
 			select: { id: true, email: true },
 		});
 

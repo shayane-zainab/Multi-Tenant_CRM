@@ -35,16 +35,17 @@ export class ConversionService {
 
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async reportingCurrency(): Promise<string> {
-		return readReportingCurrency(this.db);
+	async reportingCurrency(organizationId: string): Promise<string> {
+		return readReportingCurrency(this.db, organizationId);
 	}
 
-	async rateFor(currency: string): Promise<ResolvedRate | null> {
-		const base = await this.reportingCurrency();
+	async rateFor(organizationId: string, currency: string): Promise<ResolvedRate | null> {
+		const base = await this.reportingCurrency(organizationId);
 		return resolveRate(this.db, base, currency);
 	}
 
 	async convert(
+		organizationId: string,
 		amount: PrismaTypes.Decimal | null,
 		currency: string,
 	): Promise<Conversion | null> {
@@ -52,15 +53,16 @@ export class ConversionService {
 			this.db,
 			amount,
 			currency,
-			await this.reportingCurrency(),
+			await this.reportingCurrency(organizationId),
 		);
 	}
 
 	async dealFields(
+		organizationId: string,
 		amount: PrismaTypes.Decimal | null,
 		currency: string,
 	): Promise<DealFxFields> {
-		const converted = await this.convert(amount, currency);
+		const converted = await this.convert(organizationId, amount, currency);
 
 		if (!converted) {
 			return {
@@ -95,9 +97,10 @@ export class ConversionService {
 	}
 
 	async unconverted(
+		organizationId: string,
 		where: PrismaTypes.DealWhereInput = {},
 	): Promise<Unconverted> {
-		const base = await this.reportingCurrency();
+		const base = await this.reportingCurrency(organizationId);
 
 		const rows = await this.db.deal.groupBy({
 			by: ["currency"],
@@ -114,16 +117,16 @@ export class ConversionService {
 		};
 	}
 
-	async rerateAll(): Promise<RerateResult> {
-		return this.rerate(false);
+	async rerateAll(organizationId: string): Promise<RerateResult> {
+		return this.rerate(organizationId, false);
 	}
 
-	async fillMissing(): Promise<RerateResult> {
-		return this.rerate(true);
+	async fillMissing(organizationId: string): Promise<RerateResult> {
+		return this.rerate(organizationId, true);
 	}
 
-	private async rerate(onlyMissing: boolean): Promise<RerateResult> {
-		const base = await this.reportingCurrency();
+	private async rerate(organizationId: string, onlyMissing: boolean): Promise<RerateResult> {
+		const base = await this.reportingCurrency(organizationId);
 
 		const groups = await this.db.deal.groupBy({
 			by: ["currency"],

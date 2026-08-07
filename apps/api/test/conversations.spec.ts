@@ -5,6 +5,7 @@ import { ConversationsService } from "../src/conversations/conversations.service
 const suffix = process.env.TEST_RUN_ID ?? "conversations-spec";
 const email = `conversation.subject.${suffix}@example.test`;
 const userId = `user-${suffix}`;
+const orgId = `org-${suffix}`;
 
 function memoryCache() {
 	const store = new Map<string, unknown>();
@@ -28,11 +29,13 @@ beforeAll(async () => {
 	await db.user.deleteMany({ where: { id: userId } });
 	await db.contact.deleteMany({ where: { email } });
 
+	await db.organization.upsert({ where: { id: orgId }, create: { id: orgId, name: "Org 1", slug: `org-${suffix}`, createdAt: new Date() }, update: {} });
+
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
 	});
 	const contact = await db.contact.create({
-		data: { firstName: "Conversation", lastName: "Subject", email },
+		data: { organizationId: orgId, firstName: "Conversation", lastName: "Subject", email },
 		select: { id: true },
 	});
 	contactId = contact.id;
@@ -51,11 +54,12 @@ afterAll(async () => {
 
 describe("ConversationsService", () => {
 	it("starts a record with no history", async () => {
-		expect(await service.list({ contactId }, userId)).toEqual([]);
+		expect(await service.list(orgId, { contactId }, userId)).toEqual([]);
 	});
 
 	it("saves a cursor and titles the thread from the opening question", async () => {
 		await service.save(
+			orgId,
 			{
 				contactId,
 				sessionId: `ses_${suffix}_1`,
@@ -67,7 +71,7 @@ describe("ConversationsService", () => {
 			userId,
 		);
 
-		const [conversation] = await service.list({ contactId }, userId);
+		const [conversation] = await service.list(orgId, { contactId }, userId);
 
 		expect(conversation).toMatchObject({
 			sessionId: `ses_${suffix}_1`,
@@ -80,6 +84,7 @@ describe("ConversationsService", () => {
 
 	it("moves the cursor without renaming the thread", async () => {
 		await service.save(
+			orgId,
 			{
 				contactId,
 				sessionId: `ses_${suffix}_1`,
@@ -90,7 +95,7 @@ describe("ConversationsService", () => {
 			userId,
 		);
 
-		const [conversation] = await service.list({ contactId }, userId);
+		const [conversation] = await service.list(orgId, { contactId }, userId);
 
 		expect(conversation).toMatchObject({
 			continuationToken: "eve:token-2",
@@ -101,35 +106,36 @@ describe("ConversationsService", () => {
 	});
 
 	it("serves the list from cache, and drops it when something changes", async () => {
-		await service.list({ contactId }, userId);
+		await service.list(orgId, { contactId }, userId);
 		expect(cache.store.size).toBe(1);
 
 		await service.save(
+			orgId,
 			{ contactId, sessionId: `ses_${suffix}_2`, messageCount: 1 },
 			userId,
 		);
 		expect(cache.store.size).toBe(0);
 
-		expect(await service.list({ contactId }, userId)).toHaveLength(2);
+		expect(await service.list(orgId, { contactId }, userId)).toHaveLength(2);
 	});
 
 	it("newest first, so reopening lands on the last thing you asked", async () => {
-		const [first] = await service.list({ contactId }, userId);
+		const [first] = await service.list(orgId, { contactId }, userId);
 		expect(first?.sessionId).toBe(`ses_${suffix}_2`);
 	});
 
 	it("keeps one rep's conversations out of another's", async () => {
-		expect(await service.list({ contactId }, "somebody-else")).toEqual([]);
+		expect(await service.list(orgId, { contactId }, "somebody-else")).toEqual([]);
 	});
 
 	it("refuses a conversation that belongs to a record of neither kind", async () => {
 		expect(
-			service.save({ sessionId: `ses_${suffix}_3` }, userId),
+			service.save(orgId, { sessionId: `ses_${suffix}_3` }, userId),
 		).rejects.toThrow();
 	});
 
 	it("forgets a conversation and the events behind it", async () => {
-		const [conversation] = await service.list({ contactId }, userId);
+		const [conversation] = await service.list(orgId, { contactId }, userId);
 		if (!conversation) throw new Error("expected a conversation");
 
 		await db.agentEvent.create({
@@ -143,9 +149,9 @@ describe("ConversationsService", () => {
 			},
 		});
 
-		await service.remove(conversation.id, userId);
+		await service.remove(orgId, conversation.id, userId);
 
-		expect(await service.list({ contactId }, userId)).toHaveLength(1);
+		expect(await service.list(orgId, { contactId }, userId)).toHaveLength(1);
 		expect(
 			await db.agentEvent.count({
 				where: { sessionId: conversation.sessionId },
@@ -154,9 +160,9 @@ describe("ConversationsService", () => {
 	});
 
 	it("will not let one rep delete another's conversation", async () => {
-		const [conversation] = await service.list({ contactId }, userId);
+		const [conversation] = await service.list(orgId, { contactId }, userId);
 		if (!conversation) throw new Error("expected a conversation");
 
-		expect(service.remove(conversation.id, "somebody-else")).rejects.toThrow();
+		expect(service.remove(orgId, conversation.id, "somebody-else")).rejects.toThrow();
 	});
 });
