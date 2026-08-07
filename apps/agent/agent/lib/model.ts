@@ -6,9 +6,11 @@ export interface ModelSelection {
 	modelContextWindowTokens: number;
 }
 
-export async function selectedModel(): Promise<ModelSelection | null> {
+export async function selectedModel(organizationId?: string): Promise<ModelSelection | null> {
+	if (!organizationId) return null;
+
 	try {
-		const setting = await readAgentModel(db);
+		const setting = await readAgentModel(db, organizationId);
 
 		if (setting.isDefault) return null;
 

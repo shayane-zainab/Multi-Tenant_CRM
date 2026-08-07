@@ -15,6 +15,11 @@ void syncVersion();
 export default defineAgent({
 	model: defineDynamic({
 		fallback: DEFAULT_AGENT_MODEL.id,
-		events: { "session.started": () => selectedModel() },
+		events: {
+			"session.started": (_, ctx) => {
+				const organizationId = ctx.session.auth.current?.attributes?.organizationId as string | undefined;
+				return selectedModel(organizationId);
+			}
+		},
 	}),
 });

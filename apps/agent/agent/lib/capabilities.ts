@@ -13,9 +13,10 @@ export type Capability = {
 	readonly from: string;
 };
 
-export async function contextDevKey(): Promise<string | null> {
+export async function contextDevKey(organizationId?: string): Promise<string | null> {
+	if (!organizationId) return null;
 	try {
-		return await readContextDevKey(db);
+		return await readContextDevKey(db, organizationId);
 	} catch (error) {
 		console.error(
 			`[agent] could not read the Context.dev key from the database: ${
@@ -27,8 +28,8 @@ export async function contextDevKey(): Promise<string | null> {
 	}
 }
 
-export async function capabilities(): Promise<readonly Capability[]> {
-	return capabilitiesFrom(await contextDevKey());
+export async function capabilities(organizationId?: string): Promise<readonly Capability[]> {
+	return capabilitiesFrom(await contextDevKey(organizationId));
 }
 
 export function capabilitiesFrom(
@@ -69,8 +70,8 @@ export function capabilitiesFrom(
 	];
 }
 
-export async function enabled(id: string): Promise<boolean> {
-	return (await capabilities()).some(
+export async function enabled(id: string, organizationId?: string): Promise<boolean> {
+	return (await capabilities(organizationId)).some(
 		(capability) => capability.id === id && capability.enabled,
 	);
 }
@@ -97,8 +98,8 @@ export async function logCapabilities(): Promise<void> {
 	}
 }
 
-export async function capabilitiesMarkdown(): Promise<string> {
-	return markdownFor(await capabilities());
+export async function capabilitiesMarkdown(organizationId?: string): Promise<string> {
+	return markdownFor(await capabilities(organizationId));
 }
 
 export function markdownFor(all: readonly Capability[]): string {

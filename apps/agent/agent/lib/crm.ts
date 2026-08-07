@@ -344,7 +344,7 @@ export async function writeTimelineNote(
 ): Promise<string | null> {
 	const contact = await db.contact.findUnique({
 		where: { id: contactId },
-		select: { companyId: true, ownerId: true },
+		select: { companyId: true, ownerId: true, organizationId: true },
 	});
 	if (!contact) return null;
 
@@ -362,6 +362,7 @@ export async function writeTimelineNote(
 			occurredAt: new Date(),
 			contactId,
 			companyId: contact.companyId,
+			organizationId: contact.organizationId,
 			createdById: author,
 			meta: { ...meta, agent: "people-research" },
 		},

@@ -36,7 +36,13 @@ export default defineTool({
 		sourceUrl: z.string().optional(),
 	}),
 	async execute(input) {
-		const us = await identity();
+		const focus = currentFocus();
+		const organizationId = focus.organizationId;
+		if (!organizationId) {
+			return { written: false as const, reason: "No organization context." };
+		}
+
+		const us = await identity(organizationId);
 
 		if (!us?.website) {
 			return {
@@ -56,7 +62,7 @@ export default defineTool({
 			};
 		}
 
-		const profile = await writeWorkspaceProfile(db, {
+		const profile = await writeWorkspaceProfile(db, organizationId, {
 			website: us.website,
 			narrative,
 			sections: {

@@ -53,6 +53,7 @@ export default defineTool({
 				domain: true,
 				website: true,
 				ownerId: true,
+				organizationId: true,
 			},
 		});
 
@@ -97,6 +98,7 @@ export default defineTool({
 				body: formatBrief(result.data),
 				occurredAt: new Date(),
 				companyId: company.id,
+				organizationId: company.organizationId,
 				createdById: author,
 				meta: {
 					source: "context.dev",

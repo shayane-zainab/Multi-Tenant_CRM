@@ -5,11 +5,11 @@ import { defineHook } from "eve/hooks";
 
 let modelId: string | null = null;
 
-async function configuredModel(): Promise<string | null> {
+async function configuredModel(organizationId: string): Promise<string | null> {
 	if (modelId) return modelId;
 
 	try {
-		modelId = (await readAgentModel(db)).id;
+		modelId = (await readAgentModel(db, organizationId)).id;
 	} catch {
 		modelId = null;
 	}
@@ -69,12 +69,14 @@ export default defineHook({
 			});
 		},
 
-		async "step.failed"(event) {
+		async "step.failed"(event, ctx) {
 			if (!looksLikeModel(event.data.code)) return;
+
+			const organizationId = ctx.session.auth.current?.attributes?.organizationId as string | undefined;
 
 			modelError({
 				error: event.data.code,
-				modelId: await configuredModel(),
+				modelId: organizationId ? await configuredModel(organizationId) : null,
 			});
 		},
 	},

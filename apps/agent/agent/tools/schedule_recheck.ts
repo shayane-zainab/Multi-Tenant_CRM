@@ -1,4 +1,5 @@
 import { PRIORITY } from "@crm/db/agent-tasks";
+import { db } from "@crm/db";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { scheduleTask } from "../lib/tasks";
@@ -34,9 +35,18 @@ export default defineTool({
 			.describe("Vendor calls the next run may spend."),
 	}),
 	async execute({ contactId, days, reason, budget }) {
+		const contact = await db.contact.findUnique({
+			where: { id: contactId },
+			select: { organizationId: true },
+		});
+
+		if (!contact) {
+			return { scheduled: false as const, reason: "No such contact." };
+		}
 		const dueAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
 		await scheduleTask({
+			organizationId: contact.organizationId,
 			contactId,
 			kind: "recheck",
 			reason,
