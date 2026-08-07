@@ -1,4 +1,5 @@
 import { db } from "@crm/db";
+import { currentFocus } from "./focus";
 import { domainOf, normalise } from "./names";
 
 export type RecordKind = "contact" | "company" | "deal";
@@ -60,10 +61,15 @@ export async function searchCrm(
 	const domain = email ? domainOf(email) : bareDomain(term);
 	const words = term.split(/\s+/).filter((word) => word.length >= 2);
 
+	const { organizationId } = currentFocus();
+	if (!organizationId) {
+		return { query: term, contacts: [], companies: [], deals: [], total: 0 };
+	}
+
 	const [contacts, companies, deals] = await Promise.all([
-		wants("contact") ? searchContacts(term, words, email, limit) : [],
-		wants("company") ? searchCompanies(term, words, domain, limit) : [],
-		wants("deal") ? searchDeals(term, words, limit) : [],
+		wants("contact") ? searchContacts(organizationId, term, words, email, limit) : [],
+		wants("company") ? searchCompanies(organizationId, term, words, domain, limit) : [],
+		wants("deal") ? searchDeals(organizationId, term, words, limit) : [],
 	]);
 
 	return {
@@ -76,6 +82,7 @@ export async function searchCrm(
 }
 
 async function searchContacts(
+	organizationId: string,
 	term: string,
 	words: string[],
 	email: string | null,
@@ -89,6 +96,7 @@ async function searchContacts(
 
 	const rows = await db.contact.findMany({
 		where: {
+			organizationId,
 			OR: [
 				...(email
 					? [{ email: { equals: email, mode: "insensitive" as const } }]
@@ -132,6 +140,7 @@ async function searchContacts(
 }
 
 async function searchCompanies(
+	organizationId: string,
 	term: string,
 	words: string[],
 	domain: string | null,
@@ -139,8 +148,9 @@ async function searchCompanies(
 ): Promise<CompanyHit[]> {
 	const rows = await db.company.findMany({
 		where: {
+			organizationId,
 			OR: [
-				{ name: { contains: term, mode: "insensitive" } },
+				{ name: { contains: term, mode: "insensitive" as const } },
 				...(domain
 					? [{ domain: { contains: domain, mode: "insensitive" as const } }]
 					: []),
@@ -179,18 +189,20 @@ async function searchCompanies(
 }
 
 async function searchDeals(
+	organizationId: string,
 	term: string,
 	words: string[],
 	limit: number,
 ): Promise<DealHit[]> {
 	const rows = await db.deal.findMany({
 		where: {
+			organizationId,
 			OR: [
-				{ name: { contains: term, mode: "insensitive" } },
+				{ name: { contains: term, mode: "insensitive" as const } },
 				...words.map((word) => ({
 					name: { contains: word, mode: "insensitive" as const },
 				})),
-				{ company: { name: { contains: term, mode: "insensitive" } } },
+				{ company: { name: { contains: term, mode: "insensitive" as const } } },
 			],
 		},
 		orderBy: [{ lastActivityAt: "desc" }, { createdAt: "desc" }],

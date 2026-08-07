@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { DealStage, db, RateSource } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
-import { SETTINGS_ID, writeReportingCurrency } from "@crm/db/settings";
+import { writeReportingCurrency } from "@crm/db/settings";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DashboardService } from "../src/dashboard/dashboard.service";
@@ -17,6 +17,7 @@ const dashboard = new DashboardService(db, conversion);
 
 let companyId: string;
 let previousReportingCurrency: string | null = null;
+const orgId = "org_1";
 
 const MILLION = 100_000_000;
 const HALF_MILLION = 50_000_000;
@@ -51,18 +52,19 @@ async function clearRates() {
 }
 
 async function pipelineCents(): Promise<number> {
-	const summary = await dashboard.summary(userId, { scope: "me" });
+	const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 	return summary.pipeline.totalCents;
 }
 
 beforeAll(async () => {
-	const existing = await db.appSetting.findUnique({
+	const existing = await db.orgSetting.findUnique({
 		where: { id: SETTINGS_ID },
 		select: { reportingCurrency: true },
 	});
 	previousReportingCurrency = existing?.reportingCurrency ?? null;
 
-	await writeReportingCurrency(db, "USD");
+	await writeReportingCurrency(db, orgId, "USD");
+	await db.organization.upsert({ where: { id: orgId }, create: { id: orgId, name: "Org 1", slug: "org-1", createdAt: new Date() }, update: {} });
 	await clearRates();
 
 	await db.user.upsert({
@@ -77,8 +79,8 @@ beforeAll(async () => {
 	});
 
 	const company = await db.company.upsert({
-		where: { domain },
-		create: { name: `Money Co ${suffix}`, domain },
+		where: { domain: { organizationId: orgId, domain } },
+		create: { organizationId: orgId, name: `Money Co ${suffix}`, domain },
 		update: {},
 		select: { id: true },
 	});
@@ -89,14 +91,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await db.deal.deleteMany({ where: { companyId } });
-	await db.company.deleteMany({ where: { domain } });
+	await db.company.deleteMany({ where: { domain: { organizationId: orgId, domain } } });
 	await db.user.deleteMany({ where: { id: userId } });
 	await clearRates();
 
 	if (previousReportingCurrency) {
-		await writeReportingCurrency(db, previousReportingCurrency);
+		await writeReportingCurrency(db, orgId, previousReportingCurrency);
 	} else {
-		await db.appSetting.updateMany({ data: { reportingCurrency: null } });
+		await db.orgSetting.updateMany({ data: { organizationId: orgId, reportingCurrency: null } });
 	}
 
 	await conversion.rerateAll();
@@ -104,7 +106,7 @@ afterAll(async () => {
 
 describe("a total across currencies", () => {
 	it("converts on write and never adds two currencies together", async () => {
-		await deals.create({
+		await deals.create(orgId, {
 			name: `Domestic ${suffix}`,
 			companyId,
 			ownerId: userId,
@@ -112,7 +114,7 @@ describe("a total across currencies", () => {
 			currency: "USD",
 		});
 
-		await deals.create({
+		await deals.create(orgId, {
 			name: `Continental ${suffix}`,
 			companyId,
 			ownerId: userId,
@@ -138,7 +140,7 @@ describe("a total across currencies", () => {
 	it("leaves a deal it cannot convert out of the total, and says so", async () => {
 		const before = await pipelineCents();
 
-		await deals.create({
+		await deals.create(orgId, {
 			name: `Alpine ${suffix}`,
 			companyId,
 			ownerId: userId,
@@ -148,7 +150,7 @@ describe("a total across currencies", () => {
 
 		expect(await pipelineCents()).toBe(before);
 
-		const summary = await dashboard.summary(userId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(summary.reportingCurrency).toBe("USD");
 		expect(summary.unconverted.count).toBe(1);
 		expect(summary.unconverted.currencies).toEqual(["CHF"]);
@@ -164,7 +166,7 @@ describe("a total across currencies", () => {
 			MILLION + 1.1 * MILLION + 1.25 * HALF_MILLION,
 		);
 
-		const summary = await dashboard.summary(userId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(summary.unconverted.count).toBe(0);
 	});
 
@@ -196,12 +198,12 @@ describe("a total across currencies", () => {
 	});
 
 	it("re-rates everything when the reporting currency changes", async () => {
-		await writeReportingCurrency(db, "EUR");
+		await writeReportingCurrency(db, orgId, "EUR");
 
 		const rerated = await conversion.rerateAll();
 		expect(rerated.missing).toContain("USD");
 
-		const summary = await dashboard.summary(userId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 
 		expect(summary.reportingCurrency).toBe("EUR");
 		expect(summary.pipeline.totalCents).toBe(MILLION);
@@ -211,10 +213,10 @@ describe("a total across currencies", () => {
 
 describe("the deals list", () => {
 	it("reports its open pipeline in the reporting currency and discloses the rest", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, orgId, "USD");
 		await conversion.rerateAll();
 
-		const list = await deals.list({
+		const list = await deals.list(orgId, {
 			q: "",
 			page: 1,
 			pageSize: 25,
@@ -239,14 +241,14 @@ describe("the deals list", () => {
 
 describe("a converted figure knows which currency it is in", () => {
 	it("leaves a deal whose baseAmount predates a currency change out of totals", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, orgId, "USD");
 		await conversion.rerateAll();
 
 		const before = await pipelineCents();
-		const summary = await dashboard.summary(userId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(summary.unconverted.count).toBe(0);
 
-		const deal = await deals.create({
+		const deal = await deals.create(orgId, {
 			name: `Stale ${suffix}`,
 			companyId,
 			ownerId: userId,
@@ -258,12 +260,12 @@ describe("a converted figure knows which currency it is in", () => {
 
 		await db.deal.update({
 			where: { id: deal.id },
-			data: { baseCurrency: "JPY" },
+			data: { organizationId: orgId, baseCurrency: "JPY" },
 		});
 
 		expect(await pipelineCents()).toBe(before);
 
-		const stale = await dashboard.summary(userId, { scope: "me" });
+		const stale = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(stale.unconverted.count).toBe(1);
 
 		const filled = await conversion.fillMissing();
@@ -275,13 +277,13 @@ describe("a converted figure knows which currency it is in", () => {
 	});
 
 	it("never lets a converted figure with no currency on it go unnoticed", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, orgId, "USD");
 		await conversion.rerateAll();
 
 		const before = await pipelineCents();
 
 		const orphan = await db.deal.create({
-			data: {
+			data: { organizationId: orgId,
 				name: `Orphan ${suffix}`,
 				companyId,
 				ownerId: userId,
@@ -296,7 +298,7 @@ describe("a converted figure knows which currency it is in", () => {
 
 		expect(await pipelineCents()).toBe(before);
 
-		const summary = await dashboard.summary(userId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, userId, { scope: "me" });
 		expect(summary.unconverted.count).toBe(1);
 
 		await conversion.fillMissing();
@@ -315,7 +317,7 @@ describe("a converted figure knows which currency it is in", () => {
 		const rows = await Promise.all(
 			[" usd ", "Usd"].map((currency, index) =>
 				db.deal.create({
-					data: {
+					data: { organizationId: orgId,
 						name: `Variant ${index} ${suffix}`,
 						companyId,
 						ownerId: userId,
@@ -364,10 +366,10 @@ describe("a converted figure knows which currency it is in", () => {
 	});
 
 	it("keeps a converted deal when the rate behind it has gone away", async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, orgId, "USD");
 		await conversion.rerateAll();
 
-		const deal = await deals.create({
+		const deal = await deals.create(orgId, {
 			name: `Frozen ${suffix}`,
 			companyId,
 			ownerId: userId,
@@ -386,7 +388,7 @@ describe("a converted figure knows which currency it is in", () => {
 		await clearRates();
 
 		const stranded = await db.deal.create({
-			data: {
+			data: { organizationId: orgId,
 				name: `Stranded ${suffix}`,
 				companyId,
 				ownerId: userId,
@@ -419,7 +421,7 @@ describe("the dashboard only values what it can convert", () => {
 	const analystId = `analyst-${suffix}`;
 
 	beforeAll(async () => {
-		await writeReportingCurrency(db, "USD");
+		await writeReportingCurrency(db, orgId, "USD");
 
 		await db.user.upsert({
 			where: { id: analystId },
@@ -442,7 +444,7 @@ describe("the dashboard only values what it can convert", () => {
 		const closed = stage === DealStage.CLOSED_WON;
 
 		return db.deal.create({
-			data: {
+			data: { organizationId: orgId,
 				name: `${name} ${suffix}`,
 				companyId,
 				ownerId: analystId,
@@ -460,7 +462,7 @@ describe("the dashboard only values what it can convert", () => {
 	}
 
 	it("does not average a won deal it cannot value into the rest", async () => {
-		const won = await deals.create({
+		const won = await deals.create(orgId, {
 			name: `Valued win ${suffix}`,
 			companyId,
 			ownerId: analystId,
@@ -471,7 +473,7 @@ describe("the dashboard only values what it can convert", () => {
 
 		const unvalued = await stale("Stale win", DealStage.CLOSED_WON);
 
-		const summary = await dashboard.summary(analystId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, analystId, { scope: "me" });
 
 		expect(summary.performance.wins).toBe(2);
 		expect(summary.performance.avgDealCents).toBe(10_000);
@@ -481,7 +483,7 @@ describe("the dashboard only values what it can convert", () => {
 	});
 
 	it("does not let a stale figure set the largest open deal", async () => {
-		const open = await deals.create({
+		const open = await deals.create(orgId, {
 			name: `Valued open ${suffix}`,
 			companyId,
 			ownerId: analystId,
@@ -491,7 +493,7 @@ describe("the dashboard only values what it can convert", () => {
 
 		const unvalued = await stale("Stale open", DealStage.DEMO_BOOKED);
 
-		const summary = await dashboard.summary(analystId, { scope: "me" });
+		const summary = await dashboard.summary(orgId, analystId, { scope: "me" });
 
 		expect(summary.biggestOpen[0]?.id).toBe(open.id);
 		expect(summary.biggestOpen[0]?.baseAmountCents).toBe(10_000);

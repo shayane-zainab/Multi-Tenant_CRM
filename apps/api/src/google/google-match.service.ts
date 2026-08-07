@@ -32,6 +32,7 @@ export type MatchContext = {
 };
 
 export type MatchRequest = {
+	organizationId: string;
 	participants: readonly Participant[];
 	allowCreate: boolean;
 	source: SyncRecordSource;
@@ -49,11 +50,14 @@ export class GoogleMatchService {
 		private readonly log: EnrichmentLogService,
 	) {}
 
-	async internalIdentity(): Promise<{
+	async internalIdentity(organizationId: string): Promise<{
 		addresses: Set<string>;
 		domains: Set<string>;
 	}> {
-		const users = await this.db.user.findMany({ select: { email: true } });
+		const users = await this.db.user.findMany({
+			where: { members: { some: { organizationId } } },
+			select: { email: true },
+		});
 
 		const addresses = new Set<string>();
 		const domains = new Set<string>(workspaceDomains());
@@ -69,15 +73,17 @@ export class GoogleMatchService {
 		return { addresses, domains };
 	}
 
-	async suppressedDomains(): Promise<Set<string>> {
+	async suppressedDomains(organizationId: string): Promise<Set<string>> {
 		const rows = await this.db.suppressedDomain.findMany({
+			where: { organizationId },
 			select: { domain: true },
 		});
 		return new Set(rows.map((row) => row.domain));
 	}
 
-	async suppressedEmails(): Promise<Set<string>> {
+	async suppressedEmails(organizationId: string): Promise<Set<string>> {
 		const rows = await this.db.suppressedContact.findMany({
+			where: { organizationId },
 			select: { email: true },
 		});
 		return new Set(rows.map((row) => row.email.toLowerCase()));
@@ -99,7 +105,10 @@ export class GoogleMatchService {
 		}
 
 		const contact = await this.db.contact.findFirst({
-			where: { email: { in: external.map((person) => person.email) } },
+			where: {
+				organizationId: request.organizationId,
+				email: { in: external.map((person) => person.email) },
+			},
 			select: { id: true, companyId: true },
 		});
 
@@ -120,7 +129,7 @@ export class GoogleMatchService {
 		];
 
 		const known = await this.db.company.findMany({
-			where: { domain: { in: domains } },
+			where: { organizationId: request.organizationId, domain: { in: domains } },
 			select: { id: true, domain: true },
 		});
 
@@ -162,7 +171,7 @@ export class GoogleMatchService {
 
 		if (!lead) return { companyId: null, contactId: null, external };
 
-		const companyId = await this.companies.companyForEmail(lead.email, {
+		const companyId = await this.companies.companyForEmail(request.organizationId, lead.email, {
 			ownerId: request.ownerId,
 		});
 		if (!companyId) {
@@ -181,7 +190,7 @@ export class GoogleMatchService {
 			request,
 		);
 
-		await this.log.record({
+		await this.log.record(request.organizationId, {
 			companyId,
 			subject: "Company added from your inbox",
 			body:
@@ -195,6 +204,7 @@ export class GoogleMatchService {
 			companyId,
 			domain,
 			source: request.source,
+			organizationId: request.organizationId,
 		});
 
 		return { companyId, contactId, external };
@@ -213,14 +223,20 @@ export class GoogleMatchService {
 
 		const { firstName, lastName } = splitName(person.name, person.email);
 
-		const existing = await this.db.contact.findUnique({
-			where: { email: person.email },
+		const existing = await this.db.contact.findFirst({
+			where: { organizationId: request.organizationId, email: person.email },
 			select: { id: true },
 		});
 
 		const contact = await this.db.contact.upsert({
-			where: { email: person.email },
+			where: {
+				organizationId_email: {
+					organizationId: request.organizationId,
+					email: person.email,
+				},
+			},
 			create: {
+				organizationId: request.organizationId,
 				firstName,
 				lastName,
 				email: person.email,
@@ -233,7 +249,7 @@ export class GoogleMatchService {
 		});
 
 		if (!existing) {
-			await this.log.record({
+			await this.log.record(request.organizationId, {
 				contactId: contact.id,
 				companyId,
 				subject: "Contact added from your inbox",
@@ -259,6 +275,7 @@ export class GoogleMatchService {
 
 		if (isPlaceholder && !hasRealName) {
 			await this.agent.contactCreated(
+				request.organizationId,
 				contact.id,
 				"Created by the sync from an address, with no name on it",
 			);

@@ -68,18 +68,30 @@ export class BackfillService implements OnModuleInit {
 
 		void (async () => {
 			try {
-				await this.sweepWorkspace();
+				const orgs = await this.db.organization.findMany({ select: { id: true } });
+				
+				let totalQueued = 0;
+				let totalRemaining = 0;
+				let totalIconsResolving = 0;
 
-				const companies = await this.runCompanies(false);
-				const contacts = await this.runContacts();
+				for (const org of orgs) {
+					await this.sweepWorkspace(org.id);
+
+					const companies = await this.runCompanies(org.id, false);
+					const contacts = await this.runContacts(org.id);
+
+					totalQueued += companies.queued + contacts.queued;
+					totalRemaining += companies.remaining + contacts.remaining;
+					totalIconsResolving += companies.iconsResolving;
+				}
 
 				const mirrored = await this.images.sweep();
 
 				this.logger.log({
 					message: "Automatic backfill swept",
-					queued: companies.queued + contacts.queued,
-					remaining: companies.remaining + contacts.remaining,
-					iconsResolving: companies.iconsResolving,
+					queued: totalQueued,
+					remaining: totalRemaining,
+					iconsResolving: totalIconsResolving,
 					imagesMirrored: mirrored.copied,
 				});
 			} catch (error) {
@@ -93,13 +105,14 @@ export class BackfillService implements OnModuleInit {
 		return { started: true };
 	}
 
-	private async sweepWorkspace(): Promise<void> {
-		const us = await readWorkspaceIdentity(this.db);
+	private async sweepWorkspace(organizationId: string): Promise<void> {
+		const us = await readWorkspaceIdentity(this.db, organizationId);
 
 		if (!us?.website || us.profile) return;
 
 		const attempted = await this.db.agentTask.findFirst({
 			where: {
+				organizationId,
 				kind: "workspace-profile",
 				finishedAt: { gte: new Date(Date.now() - RECHECK_WORKSPACE_AFTER_MS) },
 			},
@@ -109,24 +122,25 @@ export class BackfillService implements OnModuleInit {
 		if (attempted) return;
 
 		await this.agent.workspaceChanged(
+			organizationId,
 			us.website,
 			"We still have no profile of the company using this CRM",
 		);
 	}
 
-	async run(scope: BackfillScope): Promise<BackfillResult> {
-		if (scope === "contacts") return this.runContacts();
+	async run(organizationId: string, scope: BackfillScope): Promise<BackfillResult> {
+		if (scope === "contacts") return this.runContacts(organizationId);
 
-		return this.runCompanies(scope === "deals");
+		return this.runCompanies(organizationId, scope === "deals");
 	}
 
-	private async runCompanies(dealsOnly: boolean): Promise<BackfillResult> {
+	private async runCompanies(organizationId: string, dealsOnly: boolean): Promise<BackfillResult> {
 		const onDeals: Prisma.CompanyWhereInput = dealsOnly
 			? { deals: { some: {} } }
 			: {};
 
-		const needsBrand = this.companiesNeedingBrand();
-		const needsArtwork = await this.companiesNeedingArtwork();
+		const needsBrand = this.companiesNeedingBrand(organizationId);
+		const needsArtwork = await this.companiesNeedingArtwork(organizationId);
 
 		const [total, rows, artworkRows] = await Promise.all([
 			this.db.company.count({
@@ -153,7 +167,7 @@ export class BackfillService implements OnModuleInit {
 			]),
 		].slice(0, MAX_PER_RUN);
 
-		const brand = await this.agent.backfill({
+		const brand = await this.agent.backfill(organizationId, {
 			kind: "brand",
 			reason: "Backfill — this company has no logo or icon",
 			companyIds,
@@ -161,7 +175,7 @@ export class BackfillService implements OnModuleInit {
 			priority: PRIORITY.brand,
 		});
 
-		const profile = await this.agent.backfill({
+		const profile = await this.agent.backfill(organizationId, {
 			kind: "company-profile",
 			reason: "Backfill — this company was never successfully looked up",
 			companyIds: rows.map((row) => row.id),
@@ -172,7 +186,7 @@ export class BackfillService implements OnModuleInit {
 			alreadyQueued: brand.alreadyQueued + profile.alreadyQueued,
 		};
 
-		const iconsResolving = dealsOnly ? 0 : await this.sweepFavicons();
+		const iconsResolving = dealsOnly ? 0 : await this.sweepFavicons(organizationId);
 
 		return {
 			...queued,
@@ -181,8 +195,8 @@ export class BackfillService implements OnModuleInit {
 		};
 	}
 
-	private async runContacts(): Promise<BackfillResult> {
-		const needsPhoto = await this.contactsNeedingPhoto();
+	private async runContacts(organizationId: string): Promise<BackfillResult> {
+		const needsPhoto = await this.contactsNeedingPhoto(organizationId);
 
 		const [photoTotal, photoRows] = await Promise.all([
 			this.db.contact.count({ where: needsPhoto }),
@@ -194,7 +208,7 @@ export class BackfillService implements OnModuleInit {
 			}),
 		]);
 
-		const photos = await this.agent.backfill({
+		const photos = await this.agent.backfill(organizationId, {
 			kind: "portrait",
 			reason: "Backfill — somewhere to look for a picture, and no picture",
 			contactIds: photoRows.map((row) => row.id),
@@ -205,10 +219,10 @@ export class BackfillService implements OnModuleInit {
 		const headroom = MAX_PER_RUN - photoRows.length;
 
 		const [researchTotal, researchRows] = await Promise.all([
-			this.db.contact.count({ where: this.contactsNeverResearched() }),
+			this.db.contact.count({ where: this.contactsNeverResearched(organizationId) }),
 			headroom > 0
 				? this.db.contact.findMany({
-						where: this.contactsNeverResearched(),
+						where: this.contactsNeverResearched(organizationId),
 						orderBy: { createdAt: "asc" },
 						take: headroom,
 						select: { id: true },
@@ -216,7 +230,7 @@ export class BackfillService implements OnModuleInit {
 				: Promise.resolve([]),
 		]);
 
-		const research = await this.agent.backfill({
+		const research = await this.agent.backfill(organizationId, {
 			kind: "identify",
 			reason: "Backfill — this contact was never researched",
 			contactIds: researchRows.map((row) => row.id),
@@ -232,9 +246,9 @@ export class BackfillService implements OnModuleInit {
 		};
 	}
 
-	private async sweepFavicons(): Promise<number> {
+	private async sweepFavicons(organizationId: string): Promise<number> {
 		const rows = await this.db.company.findMany({
-			where: { domain: { not: null }, iconUrl: null },
+			where: { organizationId, domain: { not: null }, iconUrl: null },
 			orderBy: { createdAt: "asc" },
 			take: MAX_FAVICONS,
 			select: { id: true, domain: true },
@@ -251,21 +265,22 @@ export class BackfillService implements OnModuleInit {
 				message: "Favicon sweep finished",
 				attempted: rows.length,
 				resolved,
+				organizationId,
 			});
 		})();
 
 		return rows.length;
 	}
 
-	private companiesNeedingBrand(): Prisma.CompanyWhereInput {
-		return { domain: { not: null }, enrichmentStatus: NEVER_SUCCEEDED };
+	private companiesNeedingBrand(organizationId: string): Prisma.CompanyWhereInput {
+		return { organizationId, domain: { not: null }, enrichmentStatus: NEVER_SUCCEEDED };
 	}
 
-	private async companiesNeedingArtwork(): Promise<Prisma.CompanyWhereInput> {
+	private async companiesNeedingArtwork(organizationId: string): Promise<Prisma.CompanyWhereInput> {
 		const since = new Date(Date.now() - RECHECK_BRAND_AFTER_MS);
 
 		const checked = await this.db.agentTask.findMany({
-			where: { kind: "brand", finishedAt: { gte: since } },
+			where: { organizationId, kind: "brand", finishedAt: { gte: since } },
 			select: { companyId: true },
 		});
 
@@ -274,6 +289,7 @@ export class BackfillService implements OnModuleInit {
 			.filter((id): id is string => id !== null);
 
 		return {
+			organizationId,
 			domain: { not: null },
 			logoUrl: null,
 			iconUrl: null,
@@ -281,29 +297,11 @@ export class BackfillService implements OnModuleInit {
 		};
 	}
 
-	/**
-	 * Contacts with a face to fetch and nowhere it has been put yet.
-	 *
-	 * Three doors qualify, matching the agent's chain: a LinkedIn URL, a GitHub
-	 * URL, or an employer with a website. The third is the expensive one — it
-	 * spends Context.dev credits reading the company's team page — and it is in
-	 * here because it works, which is the only reason worth having.
-	 *
-	 * Which makes the exclusion below load-bearing rather than an optimisation.
-	 * Most people are not on their employer's team page and never will be, so
-	 * without it every sweep would pay to re-read the same forty sites and find
-	 * the same nothing, for as long as the install runs. A finished `portrait`
-	 * task is the record that we looked; a month is long enough that a rebuilt
-	 * team page or a new LinkedIn account is still picked up eventually.
-	 */
-	private async contactsNeedingPhoto(): Promise<Prisma.ContactWhereInput> {
+	private async contactsNeedingPhoto(organizationId: string): Promise<Prisma.ContactWhereInput> {
 		const since = new Date(Date.now() - RECHECK_PHOTO_AFTER_MS);
 
-		// `AgentTask.contactId` is a bare column with no Prisma relation, so this
-		// cannot be a nested `some`. Two queries, and the id list is bounded by
-		// the number of contacts we have already looked for.
 		const checked = await this.db.agentTask.findMany({
-			where: { kind: "portrait", finishedAt: { gte: since } },
+			where: { organizationId, kind: "portrait", finishedAt: { gte: since } },
 			select: { contactId: true },
 		});
 
@@ -312,6 +310,7 @@ export class BackfillService implements OnModuleInit {
 			.filter((id): id is string => id !== null);
 
 		return {
+			organizationId,
 			imageUrl: null,
 			...(recentlyChecked.length > 0 ? { id: { notIn: recentlyChecked } } : {}),
 			OR: [
@@ -322,7 +321,7 @@ export class BackfillService implements OnModuleInit {
 		};
 	}
 
-	private contactsNeverResearched(): Prisma.ContactWhereInput {
-		return { enrichmentStatus: NEVER_SUCCEEDED };
+	private contactsNeverResearched(organizationId: string): Prisma.ContactWhereInput {
+		return { organizationId, enrichmentStatus: NEVER_SUCCEEDED };
 	}
 }

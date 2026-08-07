@@ -19,6 +19,7 @@ const orphanDomain = `orphaned-${suffix}.test`;
 const email = `gone@${domain}`;
 const colleague = `stays@${domain}`;
 const userId = `user-${suffix}`;
+const orgId = "org_1";
 
 const stamp = new ActivityStampService(db);
 
@@ -45,12 +46,12 @@ const companies = new CompaniesService(
 const match = new GoogleMatchService(db, directory, agent, log);
 
 async function matchContext() {
-	const internal = await match.internalIdentity();
+	const internal = await match.internalIdentity(orgId);
 	return {
 		ourAddresses: internal.addresses,
 		ourDomains: internal.domains,
-		suppressedDomains: await match.suppressedDomains(),
-		suppressedEmails: await match.suppressedEmails(),
+		suppressedDomains: await match.suppressedDomains(orgId),
+		suppressedEmails: await match.suppressedEmails(orgId),
 	};
 }
 
@@ -61,7 +62,7 @@ const ours = {
 
 async function parked(subject: { contactId?: string; companyId?: string }) {
 	return db.agentTask.create({
-		data: {
+		data: { organizationId: orgId,
 			...subject,
 			kind: "identify",
 			reason: `record-delete-spec (${suffix})`,
@@ -101,6 +102,7 @@ async function clean() {
 
 beforeAll(async () => {
 	await clean();
+	await db.organization.upsert({ where: { id: orgId }, create: { id: orgId, name: "Org 1", slug: "org-1", createdAt: new Date() }, update: {} });
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
 	});
@@ -112,7 +114,7 @@ describe("deleting a contact", () => {
 	let contactId: string;
 
 	it("takes the record, its queued research and its transcript with it", async () => {
-		const created = await contacts.create({
+		const created = await contacts.create(orgId, {
 			firstName: "Gone",
 			lastName: "Person",
 			email,
@@ -123,17 +125,16 @@ describe("deleting a contact", () => {
 		await parked({ contactId });
 
 		await db.agentEvent.create({
-			data: {
-				id: `evt-${suffix}`,
+			data: { id: `evt-${suffix}`,
 				sessionId: `ses-${suffix}`,
 				contactId,
 				type: "session.started",
-				data: {},
+				data: { organizationId: orgId,},
 				emittedAt: new Date(),
 			},
 		});
 
-		expect(await contacts.delete(contactId)).toEqual({
+		expect(await contacts.delete(orgId, contactId)).toEqual({
 			id: contactId,
 			name: "Gone Person",
 		});
@@ -153,7 +154,7 @@ describe("deleting a contact", () => {
 
 		const result = await match.resolve(
 			{
-				participants: [{ email, name: "Gone Person" }],
+				organizationId: orgId, participants: [{ email, name: "Gone Person" }],
 				allowCreate: true,
 				source: RecordSource.EMAIL,
 				ownerId: userId,
@@ -169,7 +170,7 @@ describe("deleting a contact", () => {
 	it("still files the colleagues who were not deleted", async () => {
 		const result = await match.resolve(
 			{
-				participants: [
+				organizationId: orgId, participants: [
 					{ email, name: "Gone Person" },
 					{ email: colleague, name: "Stays Here" },
 				],
@@ -187,7 +188,7 @@ describe("deleting a contact", () => {
 	});
 
 	it("lets a rep add them back by hand, which lifts the suppression", async () => {
-		const readded = await contacts.create({ firstName: "Gone", email });
+		const readded = await contacts.create(orgId, { firstName: "Gone", email });
 
 		expect(
 			await db.suppressedContact.findUnique({ where: { email } }),
@@ -201,7 +202,7 @@ describe("deleting a contact", () => {
 		const typed = `Mixed.Case@${domain.toUpperCase()}`;
 		const asSynced = typed.toLowerCase();
 
-		const created = await contacts.create({ firstName: "Mixed", email: typed });
+		const created = await contacts.create(orgId, { firstName: "Mixed", email: typed });
 
 		expect(
 			await db.contact.findUnique({
@@ -210,7 +211,7 @@ describe("deleting a contact", () => {
 			}),
 		).toEqual({ email: asSynced });
 
-		await contacts.delete(created.id);
+		await contacts.delete(orgId, created.id);
 
 		expect(
 			await db.suppressedContact.findUnique({ where: { email: asSynced } }),
@@ -218,7 +219,7 @@ describe("deleting a contact", () => {
 
 		const result = await match.resolve(
 			{
-				participants: [{ email: asSynced, name: "Mixed Case" }],
+				organizationId: orgId, participants: [{ email: asSynced, name: "Mixed Case" }],
 				allowCreate: true,
 				source: RecordSource.EMAIL,
 				ownerId: userId,
@@ -235,24 +236,24 @@ describe("deleting a contact", () => {
 
 describe("deleting a company", () => {
 	it("takes its deals and leaves its people without a company", async () => {
-		const company = await companies.create({
+		const company = await companies.create(orgId, {
 			name: "Doomed",
 			domain: doomedDomain,
 		});
-		const contact = await contacts.create({
+		const contact = await contacts.create(orgId, {
 			firstName: "Left",
 			lastName: "Behind",
 			email: `left@${doomedDomain}`,
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { name: "Doomed deal", companyId: company.id, ownerId: userId },
+			data: { organizationId: orgId, name: "Doomed deal", companyId: company.id, ownerId: userId },
 			select: { id: true },
 		});
 
 		await parked({ companyId: company.id });
 
-		expect(await companies.delete(company.id)).toEqual({
+		expect(await companies.delete(orgId, company.id)).toEqual({
 			id: company.id,
 			name: "Doomed",
 		});
@@ -274,23 +275,23 @@ describe("deleting a company", () => {
 
 describe("the activity stamps a delete leaves behind", () => {
 	it("are recomputed on every record the deleted one's activities touched", async () => {
-		const company = await companies.create({
+		const company = await companies.create(orgId, {
 			name: "Stamped",
 			domain: stampDomain,
 		});
-		const contact = await contacts.create({
+		const contact = await contacts.create(orgId, {
 			firstName: "Stamped",
 			email: `stamped@${stampDomain}`,
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { name: "Stamped deal", companyId: company.id, ownerId: userId },
+			data: { organizationId: orgId, name: "Stamped deal", companyId: company.id, ownerId: userId },
 			select: { id: true },
 		});
 
 		const at = new Date();
 		await db.activity.create({
-			data: {
+			data: { organizationId: orgId,
 				type: "NOTE",
 				subject: "The only thing on this account",
 				companyId: company.id,
@@ -300,7 +301,7 @@ describe("the activity stamps a delete leaves behind", () => {
 				createdAt: at,
 			},
 		});
-		await stamp.touch(
+		await stamp.touch(orgId, 
 			{ companyId: company.id, contactId: contact.id, dealId: deal.id },
 			at,
 		);
@@ -322,23 +323,23 @@ describe("the activity stamps a delete leaves behind", () => {
 	});
 
 	it("follow a deleted company through the deals it takes with it", async () => {
-		const company = await companies.create({
+		const company = await companies.create(orgId, {
 			name: "Orphaner",
 			domain: orphanDomain,
 		});
-		const contact = await contacts.create({
+		const contact = await contacts.create(orgId, {
 			firstName: "Orphaned",
 			email: `orphaned@${orphanDomain}`,
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { name: "Orphaned deal", companyId: company.id, ownerId: userId },
+			data: { organizationId: orgId, name: "Orphaned deal", companyId: company.id, ownerId: userId },
 			select: { id: true },
 		});
 
 		const at = new Date();
 		await db.activity.create({
-			data: {
+			data: { organizationId: orgId,
 				type: "MEETING",
 				subject: "Only ever attached to the deal",
 				contactId: contact.id,
@@ -347,9 +348,9 @@ describe("the activity stamps a delete leaves behind", () => {
 				createdAt: at,
 			},
 		});
-		await stamp.touch({ contactId: contact.id, dealId: deal.id }, at);
+		await stamp.touch(orgId, { contactId: contact.id, dealId: deal.id }, at);
 
-		await companies.delete(company.id);
+		await companies.delete(orgId, company.id);
 
 		expect(
 			await db.contact.findUnique({

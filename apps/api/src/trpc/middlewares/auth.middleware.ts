@@ -18,9 +18,18 @@ export class AuthMiddleware implements TRPCMiddleware {
 			throw new TRPCError({ code: "UNAUTHORIZED" });
 		}
 
+		const organizationId = ctx.session?.session.activeOrganizationId;
+
+		if (!organizationId) {
+			throw new TRPCError({
+				code: "FORBIDDEN",
+				message: "You are not a member of this organization.",
+			});
+		}
+
 		setRequestUserId(user.id);
 
-		const nextCtx: AuthedTrpcContext = { ...ctx, user };
+		const nextCtx: AuthedTrpcContext = { ...ctx, user, organizationId };
 		return opts.next({ ctx: nextCtx });
 	}
 }

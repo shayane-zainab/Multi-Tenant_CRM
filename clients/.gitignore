@@ -1,0 +1,6 @@
+# Generated per-client configs — contain real secrets, never commit
+instances/
+
+# Registry is committed so you can track provisioned clients in version control
+# Remove this line if you prefer to gitignore it too
+# registry.json

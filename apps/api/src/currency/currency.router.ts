@@ -26,7 +26,7 @@ export class CurrencyRouter {
 
 	@Query()
 	async settings(@Ctx() ctx: AuthedTrpcContext) {
-		return this.currency.settings(ctx.user.id);
+		return this.currency.settings(ctx.organizationId, ctx.user.id);
 	}
 
 	@Mutation({ input: setReportingCurrencyInput })
@@ -34,7 +34,7 @@ export class CurrencyRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof setReportingCurrencyInput>,
 	) {
-		return this.currency.setReportingCurrency(ctx.user.id, input.currency);
+		return this.currency.setReportingCurrency(ctx.organizationId, ctx.user.id, input.currency);
 	}
 
 	@Mutation({ input: setManualRateInput })
@@ -42,7 +42,7 @@ export class CurrencyRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof setManualRateInput>,
 	) {
-		return this.currency.setManualRate(ctx.user.id, input.currency, input.rate);
+		return this.currency.setManualRate(ctx.organizationId, ctx.user.id, input.currency, input.rate);
 	}
 
 	@Mutation({ input: removeManualRateInput })
@@ -50,11 +50,11 @@ export class CurrencyRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof removeManualRateInput>,
 	) {
-		return this.currency.removeManualRate(ctx.user.id, input.currency);
+		return this.currency.removeManualRate(ctx.organizationId, ctx.user.id, input.currency);
 	}
 
 	@Mutation()
 	async refreshRates(@Ctx() ctx: AuthedTrpcContext) {
-		return this.currency.refresh(ctx.user.id);
+		return this.currency.refresh(ctx.organizationId, ctx.user.id);
 	}
 }

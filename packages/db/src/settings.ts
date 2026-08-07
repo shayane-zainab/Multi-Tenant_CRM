@@ -5,8 +5,6 @@ import {
 	normalizeCurrency,
 } from "./currency";
 
-export const SETTINGS_ID = "app";
-
 export const DEFAULT_AGENT_MODEL = {
 	id: "zai/glm-5.2-fast",
 	contextWindowTokens: 1_000_000,
@@ -18,9 +16,12 @@ export interface AgentModelSetting {
 	isDefault: boolean;
 }
 
-export async function readAgentModel(db: Db): Promise<AgentModelSetting> {
-	const row = await db.appSetting.findUnique({
-		where: { id: SETTINGS_ID },
+export async function readAgentModel(
+	db: Db,
+	organizationId: string,
+): Promise<AgentModelSetting> {
+	const row = await db.orgSetting.findUnique({
+		where: { organizationId },
 		select: { agentModelId: true, agentModelContextWindow: true },
 	});
 
@@ -38,6 +39,7 @@ export async function readAgentModel(db: Db): Promise<AgentModelSetting> {
 
 export async function writeAgentModel(
 	db: Db,
+	organizationId: string,
 	model: { id: string; contextWindowTokens: number } | null,
 ): Promise<void> {
 	const fields = {
@@ -45,9 +47,9 @@ export async function writeAgentModel(
 		agentModelContextWindow: model?.contextWindowTokens ?? null,
 	};
 
-	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
-		create: { id: SETTINGS_ID, ...fields },
+	await db.orgSetting.upsert({
+		where: { organizationId },
+		create: { organizationId, ...fields },
 		update: fields,
 	});
 }
@@ -56,28 +58,38 @@ export const CONTEXT_DEV_SIGNUP_URL = "https://link.context.dev/crm";
 
 export const CONTEXT_DEV_DISCOUNT_CODE = "CRM";
 
-export async function readContextDevKey(db: Db): Promise<string | null> {
-	const row = await db.appSetting.findUnique({
-		where: { id: SETTINGS_ID },
+export async function readContextDevKey(
+	db: Db,
+	organizationId: string,
+): Promise<string | null> {
+	const row = await db.orgSetting.findUnique({
+		where: { organizationId },
 		select: { contextDevApiKey: true },
 	});
 
 	return row?.contextDevApiKey?.trim() || null;
 }
 
-export async function writeContextDevKey(db: Db, key: string): Promise<void> {
+export async function writeContextDevKey(
+	db: Db,
+	organizationId: string,
+	key: string,
+): Promise<void> {
 	const contextDevApiKey = key.trim();
 
-	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
-		create: { id: SETTINGS_ID, contextDevApiKey },
+	await db.orgSetting.upsert({
+		where: { organizationId },
+		create: { organizationId, contextDevApiKey },
 		update: { contextDevApiKey },
 	});
 }
 
-export async function readReportingCurrency(db: Db): Promise<string> {
-	const row = await db.appSetting.findUnique({
-		where: { id: SETTINGS_ID },
+export async function readReportingCurrency(
+	db: Db,
+	organizationId: string,
+): Promise<string> {
+	const row = await db.orgSetting.findUnique({
+		where: { organizationId },
 		select: { reportingCurrency: true },
 	});
 
@@ -88,22 +100,26 @@ export async function readReportingCurrency(db: Db): Promise<string> {
 
 export async function writeReportingCurrency(
 	db: Db,
+	organizationId: string,
 	code: string,
 ): Promise<string> {
 	const reportingCurrency = normalizeCurrency(code);
 
-	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
-		create: { id: SETTINGS_ID, reportingCurrency },
+	await db.orgSetting.upsert({
+		where: { organizationId },
+		create: { organizationId, reportingCurrency },
 		update: { reportingCurrency },
 	});
 
 	return reportingCurrency;
 }
 
-export async function readRatesRefreshedAt(db: Db): Promise<Date | null> {
-	const row = await db.appSetting.findUnique({
-		where: { id: SETTINGS_ID },
+export async function readRatesRefreshedAt(
+	db: Db,
+	organizationId: string,
+): Promise<Date | null> {
+	const row = await db.orgSetting.findUnique({
+		where: { organizationId },
 		select: { ratesRefreshedAt: true },
 	});
 
@@ -112,11 +128,12 @@ export async function readRatesRefreshedAt(db: Db): Promise<Date | null> {
 
 export async function writeRatesRefreshedAt(
 	db: Db,
+	organizationId: string,
 	ratesRefreshedAt: Date,
 ): Promise<void> {
-	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
-		create: { id: SETTINGS_ID, ratesRefreshedAt },
+	await db.orgSetting.upsert({
+		where: { organizationId },
+		create: { organizationId, ratesRefreshedAt },
 		update: { ratesRefreshedAt },
 	});
 }

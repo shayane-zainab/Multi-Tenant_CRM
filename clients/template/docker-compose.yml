@@ -1,0 +1,59 @@
+services:
+  postgres-${CLIENT_SLUG}:
+    image: postgres:17-alpine
+    container_name: crm-postgres-${CLIENT_SLUG}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - crm-data-${CLIENT_SLUG}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  api-${CLIENT_SLUG}:
+    build:
+      context: ../../
+      dockerfile: clients/Dockerfile.api
+    container_name: crm-api-${CLIENT_SLUG}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${API_PORT}:3001"
+    depends_on:
+      postgres-${CLIENT_SLUG}:
+        condition: service_healthy
+
+  app-${CLIENT_SLUG}:
+    build:
+      context: ../../
+      dockerfile: clients/Dockerfile.app
+    container_name: crm-app-${CLIENT_SLUG}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${APP_PORT}:3000"
+    depends_on:
+      - api-${CLIENT_SLUG}
+
+  agent-${CLIENT_SLUG}:
+    build:
+      context: ../../
+      dockerfile: clients/Dockerfile.agent
+    container_name: crm-agent-${CLIENT_SLUG}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${AGENT_PORT}:2000"
+    depends_on:
+      - api-${CLIENT_SLUG}
+
+volumes:
+  crm-data-${CLIENT_SLUG}:
+    name: crm-data-${CLIENT_SLUG}

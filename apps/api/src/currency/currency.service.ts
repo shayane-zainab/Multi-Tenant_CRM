@@ -1,7 +1,6 @@
 import {
 	canManageCurrency,
 	isWorkspaceRole,
-	WORKSPACE_ID,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db } from "@crm/db";
@@ -60,8 +59,8 @@ export class CurrencyService {
 		private readonly rates: RatesService,
 	) {}
 
-	async settings(actingUserId: string): Promise<CurrencySettings> {
-		const reportingCurrency = await this.conversion.reportingCurrency();
+	async settings(organizationId: string, actingUserId: string): Promise<CurrencySettings> {
+		const reportingCurrency = await this.conversion.reportingCurrency(organizationId);
 
 		const [rows, refreshedAt, unconverted, usage] = await Promise.all([
 			this.db.exchangeRate.findMany({
@@ -133,14 +132,14 @@ export class CurrencyService {
 				),
 			unconverted,
 			catalog: [...CURRENCIES],
-			canManage: canManageCurrency(await this.roleOf(actingUserId)),
+			canManage: canManageCurrency(await this.roleOf(organizationId, actingUserId)),
 		};
 	}
 
-	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
+	private async roleOf(organizationId: string, userId: string): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: { organizationId, userId },
 			},
 			select: { role: true },
 		});
@@ -150,8 +149,8 @@ export class CurrencyService {
 		return isWorkspaceRole(member.role) ? member.role : "member";
 	}
 
-	private async requireManager(userId: string): Promise<void> {
-		if (!canManageCurrency(await this.roleOf(userId))) {
+	private async requireManager(organizationId: string, userId: string): Promise<void> {
+		if (!canManageCurrency(await this.roleOf(organizationId, userId))) {
 			throw new ForbiddenException(
 				"Only an owner or an admin can change how money is reported.",
 			);
@@ -159,15 +158,16 @@ export class CurrencyService {
 	}
 
 	async setReportingCurrency(
+		organizationId: string,
 		actingUserId: string,
 		code: string,
 	): Promise<CurrencySettings> {
-		await this.requireManager(actingUserId);
+		await this.requireManager(organizationId, actingUserId);
 
 		const currency = normalizeCurrency(code);
-		const current = await this.conversion.reportingCurrency();
+		const current = await this.conversion.reportingCurrency(organizationId);
 
-		if (currency === current) return this.settings(actingUserId);
+		if (currency === current) return this.settings(organizationId, actingUserId);
 
 		await writeReportingCurrency(this.db, currency);
 
@@ -184,18 +184,19 @@ export class CurrencyService {
 			missing: rerated.missing,
 		});
 
-		return this.settings(actingUserId);
+		return this.settings(organizationId, actingUserId);
 	}
 
 	async setManualRate(
+		organizationId: string,
 		actingUserId: string,
 		code: string,
 		rate: number,
 	): Promise<CurrencySettings> {
-		await this.requireManager(actingUserId);
+		await this.requireManager(organizationId, actingUserId);
 
 		const quoteCurrency = normalizeCurrency(code);
-		const baseCurrency = await this.conversion.reportingCurrency();
+		const baseCurrency = await this.conversion.reportingCurrency(organizationId);
 
 		if (quoteCurrency === baseCurrency) {
 			throw new BadRequestException(
@@ -232,17 +233,18 @@ export class CurrencyService {
 			converted: filled.converted,
 		});
 
-		return this.settings(actingUserId);
+		return this.settings(organizationId, actingUserId);
 	}
 
 	async removeManualRate(
+		organizationId: string,
 		actingUserId: string,
 		code: string,
 	): Promise<CurrencySettings> {
-		await this.requireManager(actingUserId);
+		await this.requireManager(organizationId, actingUserId);
 
 		const quoteCurrency = normalizeCurrency(code);
-		const baseCurrency = await this.conversion.reportingCurrency();
+		const baseCurrency = await this.conversion.reportingCurrency(organizationId);
 
 		await this.db.exchangeRate.deleteMany({
 			where: { baseCurrency, quoteCurrency, source: RateSource.MANUAL },
@@ -254,11 +256,11 @@ export class CurrencyService {
 			quoteCurrency,
 		});
 
-		return this.settings(actingUserId);
+		return this.settings(organizationId, actingUserId);
 	}
 
-	async refresh(actingUserId: string): Promise<CurrencySettings> {
-		await this.requireManager(actingUserId);
+	async refresh(organizationId: string, actingUserId: string): Promise<CurrencySettings> {
+		await this.requireManager(organizationId, actingUserId);
 
 		const refresh = await this.rates.refresh();
 
@@ -268,6 +270,6 @@ export class CurrencyService {
 
 		await this.conversion.fillMissing();
 
-		return this.settings(actingUserId);
+		return this.settings(organizationId, actingUserId);
 	}
 }

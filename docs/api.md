@@ -31,39 +31,17 @@ so the row survives the agent being down.
 About to add a vendor client to `apps/api`? You want `apps/agent/agent/lib`. One
 documented exception, for timing: the exchange-rate fetcher, below.
 
-## One organization, and it is not a tenancy boundary
+## Multi-Tenant Architecture
 
-Single tenant. No org header, no org interceptor, no org-scoped cache keys, **no
-`organizationId` on any CRM record.**
+The CRM is multi-tenant. The tenancy boundary is the `Organization` (Workspace). `organizationId` flows through every API service and database model.
 
-A **singleton workspace** exists — Better Auth's `organization` plugin, one row with
-id `WORKSPACE_ID` (the literal `workspace`, in `@crm/db`, re-exported by `@crm/auth`
-so the agent needn't depend on it). It answers only: what are we called, who works
-here, what do we sell.
-
-- **The id is a constant, never a parameter.** A function taking an `organizationId`
-  has turned the plugin into tenancy plumbing.
-- **Signing in is the join; no invite flow.** `ensureWorkspaceMembership` runs in
-  `databaseHooks.session.create.before` and **degrades, never throws** — a throw fails
-  the session create and locks everyone out. The plugin's `invitation` table is unused.
-- **First account is owner**, and the hook enrols pre-existing users, oldest first.
-- **Permissions come from `@crm/auth`** — `canRenameWorkspace`, `canChangeRole`,
-  `canConfigureSso`, `canManageCurrency` — enforced by the service *and* used to
-  disable the UI control, so the button and the 403 cannot disagree.
-  `WorkspaceService` adds one invariant: **the last owner cannot be demoted**, with
-  `FOR UPDATE` on the owner rows before counting.
-- **Reads and writes go through tRPC**, not `authClient.organization.*`.
-- **Name and website are required at onboarding and cannot be skipped**, in the form
-  *and* in `updateWorkspaceInput`, posting the same `workspace.update` as settings.
-- **Onboarded state is `onboardedAt` inside the plugin's `metadata` blob**, not a
-  column; `isOnboarded`/`markOnboarded` (`@crm/db/workspace`) are the only accessors,
-  and `markOnboarded` preserves every other key.
-- **The name starts as `DEFAULT_WORKSPACE_NAME` (`CRM`), a placeholder not an
-  answer.** The header renders `<name> CRM`, so `workspaceLabel` tests the name rather
-  than comparing to the default.
-- **The website queues the agent's `workspace-profile` task** and goes through
-  `normalizeDomain`, rejecting null. Stored canonical, so re-saving uncanonically
-  counts as a change and re-queues research.
+- **The id comes from the session.** A function taking an `organizationId` parameter gets it from `ctx.organizationId` (provided by `AuthMiddleware`), never from the request body or parameters.
+- **Data Isolation:** All database reads and writes must explicitly filter by `organizationId`.
+- **Signing in is the join; no invite flow.** `ensureOrganizationMembership` runs in `databaseHooks.session.create.before` and assigns users to organizations based on allow-lists or domains.
+- **Permissions come from `@crm/auth`** — `canRenameWorkspace`, `canChangeRole` — enforced by the service *and* used to disable the UI control.
+- **The Google sync exception.** The `gmail-sync` and `calendar-sync` services run via cron and are not behind `AuthMiddleware`. They must derive `organizationId` from the `MailboxSync` row, not a session.
+- **The name starts as `DEFAULT_WORKSPACE_NAME` (`CRM`), a placeholder not an answer.** The header renders `<name> CRM`.
+- **The website queues the agent's `workspace-profile` task** and goes through `normalizeDomain`.
 
 ### Gates in `proxy.ts`
 
@@ -85,12 +63,11 @@ request.
 ### The name is also the URL
 
 Served under the workspace slug (`/comp-ai/companies`). **Cosmetic, not tenancy** —
-every query still resolves through `WORKSPACE_ID`.
+every query still resolves through `ctx.organizationId` (from the session).
 
 - **The slug is the plugin's column**, written by `workspaceSlug(name)`
   (`@crm/db/workspace`) on rename and create. **Never derive it on read.**
-- `ensureWorkspaceMembership` reconciles it; `RESERVED_SLUGS` prevents collision with
-  a real route (a collision gets `-crm`).
+- `RESERVED_SLUGS` prevents collision with a real route (a collision gets `-crm`).
 - **The proxy is the only thing that puts the slug on.** Missing or stale slugs are
   redirected with the query string intact, not 404'd; `[slug]/layout.tsx` is the
   backstop.
@@ -106,7 +83,7 @@ self-hoster's admin cannot redeploy.
 
 - **OpenID Connect only** — issuer, client id, secret; endpoints from discovery. No
   SAML UI: it needs an X.509 cert and SP signing key we have nowhere to keep.
-- `SsoService` passes `WORKSPACE_ID`, never an input.
+- `SsoService` passes `organizationId` explicitly to every method to enforce isolation.
 - **Management is tRPC (`sso.*`); signing in is `authClient.signIn.sso()`.**
 - **`sso.signInOptions` is the one public procedure in the app.** Every other `sso.*`
   takes `AuthMiddleware` at the *method*, which is what leaves it open. A client

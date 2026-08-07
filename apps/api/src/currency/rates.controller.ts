@@ -1,3 +1,5 @@
+import type { Db } from "@crm/db";
+import { InjectDatabase } from "../database/database.constants";
 import {
 	Controller,
 	ForbiddenException,
@@ -22,6 +24,7 @@ export class RatesController {
 		private readonly rates: RatesService,
 		private readonly conversion: ConversionService,
 		config: ConfigService<EnvironmentVariables, true>,
+		@InjectDatabase() private readonly db: Db,
 	) {
 		this.secret = config.get("CRON_SECRET", { infer: true });
 	}
@@ -50,13 +53,20 @@ export class RatesController {
 			throw new ForbiddenException();
 		}
 
-		const refresh = await this.rates.refresh();
+		const orgs = await this.db.organization.findMany({ select: { id: true } });
+		const results = [];
 
-		if (!refresh.ok) return refresh;
+		for (const org of orgs) {
+			const refresh = await this.rates.refresh(org.id);
+			if (!refresh.ok) {
+				results.push(refresh);
+				continue;
+			}
+			const filled = await this.conversion.fillMissing(org.id);
+			results.push({ ...refresh, converted: filled.converted, missing: filled.missing });
+		}
 
-		const filled = await this.conversion.fillMissing();
-
-		return { ...refresh, converted: filled.converted, missing: filled.missing };
+		return { results };
 	}
 }
 

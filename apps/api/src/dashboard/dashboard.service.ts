@@ -36,9 +36,15 @@ export class DashboardService {
 		private readonly conversion: ConversionService,
 	) {}
 
-	async summary(actingUserId: string, input: DashboardSummaryInput) {
+	async summary(
+		organizationId: string,
+		actingUserId: string,
+		input: DashboardSummaryInput,
+	) {
 		const mine = input.scope === "me";
-		const owned = mine ? { ownerId: actingUserId } : {};
+		const owned = mine
+			? { organizationId, ownerId: actingUserId }
+			: { organizationId };
 
 		const now = new Date();
 		const startOfMonth = monthStart(now, 0);
@@ -133,6 +139,7 @@ export class DashboardService {
 			}),
 			this.db.activity.findMany({
 				where: {
+					organizationId,
 					type: ActivityType.TASK,
 					completedAt: null,
 					dueAt: { lt: now },
@@ -149,7 +156,9 @@ export class DashboardService {
 				},
 			}),
 			this.db.activity.findMany({
-				where: mine ? { createdById: actingUserId } : {},
+				where: mine
+					? { organizationId, createdById: actingUserId }
+					: { organizationId },
 				orderBy: [{ createdAt: "desc" }],
 				take: 12,
 				select: {

@@ -45,10 +45,10 @@ export class SettingsService {
 		private readonly backfill: BackfillService,
 	) {}
 
-	async agentModel(): Promise<AgentModelSettings> {
+	async agentModel(organizationId: string): Promise<AgentModelSettings> {
 		const [model, row] = await Promise.all([
-			readAgentModel(this.db),
-			this.db.appSetting.findFirst({ select: { updatedAt: true } }),
+			readAgentModel(this.db, organizationId),
+			this.db.orgSetting.findFirst({ where: { organizationId }, select: { updatedAt: true } }),
 		]);
 
 		return {
@@ -60,11 +60,11 @@ export class SettingsService {
 		};
 	}
 
-	async setAgentModel(modelId: string | null): Promise<AgentModelSettings> {
+	async setAgentModel(organizationId: string, modelId: string | null): Promise<AgentModelSettings> {
 		if (modelId === null) {
-			await writeAgentModel(this.db, null);
-			this.logger.log({ message: "Agent model reset to the default" });
-			return this.agentModel();
+			await writeAgentModel(this.db, organizationId, null);
+			this.logger.log({ message: "Agent model reset to the default", organizationId });
+			return this.agentModel(organizationId);
 		}
 
 		const models = await this.catalog.models();
@@ -83,14 +83,14 @@ export class SettingsService {
 			);
 		}
 
-		await writeAgentModel(this.db, {
+		await writeAgentModel(this.db, organizationId, {
 			id: chosen.id,
 			contextWindowTokens: chosen.contextWindowTokens,
 		});
 
-		this.logger.log({ message: "Agent model changed", modelId: chosen.id });
+		this.logger.log({ message: "Agent model changed", modelId: chosen.id, organizationId });
 
-		return this.agentModel();
+		return this.agentModel(organizationId);
 	}
 
 	async modelCatalog(): Promise<ModelCatalogResult> {
@@ -98,24 +98,25 @@ export class SettingsService {
 		return { models: models ?? [], available: models !== null };
 	}
 
-	async researchKey(): Promise<ResearchKeySettings> {
-		const key = await readContextDevKey(this.db);
+	async researchKey(organizationId: string): Promise<ResearchKeySettings> {
+		const key = await readContextDevKey(this.db, organizationId);
 
 		return { configured: key !== null, hint: key ? maskKey(key) : null };
 	}
 
-	async setResearchKey(apiKey: string): Promise<ResearchKeySettings> {
+	async setResearchKey(organizationId: string, apiKey: string): Promise<ResearchKeySettings> {
 		const check = await this.researchKeys.verify(apiKey);
 
 		if (check.outcome === "invalid") {
 			throw new BadRequestException(check.reason);
 		}
 
-		await writeContextDevKey(this.db, apiKey);
+		await writeContextDevKey(this.db, organizationId, apiKey);
 
 		this.logger.log({
 			message: "Context key saved",
 			verified: check.outcome === "valid",
+			organizationId,
 		});
 
 		// Every company added while there was no key is still PENDING, because a
@@ -123,23 +124,24 @@ export class SettingsService {
 		// sweep would find them, but the person who just fixed it is standing
 		// here — so pick the work up now rather than on their next sign-in.
 		void this.backfill
-			.run("companies")
+			.run(organizationId, "companies")
 			.then(({ queued, remaining }) => {
 				if (queued > 0) {
 					this.logger.log({
 						message: "Queued the research that was waiting on a key",
 						queued,
 						remaining,
+						organizationId,
 					});
 				}
 			})
 			.catch((error: unknown) => {
 				this.logger.warn(
-					{ message: "Could not queue the waiting research" },
+					{ message: "Could not queue the waiting research", organizationId },
 					error instanceof Error ? error.stack : String(error),
 				);
 			});
 
-		return this.researchKey();
+		return this.researchKey(organizationId);
 	}
 }

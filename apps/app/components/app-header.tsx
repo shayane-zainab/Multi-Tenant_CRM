@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useMobileNav } from "@/components/mobile-nav";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 
 type User = { name: string; email: string; image: string | null };
 
@@ -81,7 +82,10 @@ export function AppHeader({ user }: { user: User }) {
 					<Logo className="size-5" />
 				</Link>
 				<Separator orientation="vertical" className="mx-1 h-5 bg-transparent" />
-				<span className="min-w-0 truncate font-medium text-sm">{label}</span>
+				<WorkspaceSwitcher
+					currentWorkspaceId={workspace.data?.id}
+					currentWorkspaceName={label}
+				/>
 			</div>
 
 			<div className="ml-auto flex shrink-0 items-center gap-1.5">

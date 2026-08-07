@@ -120,6 +120,7 @@ export function taskAuth(task: LeasedTask, base: AppAuth = APP_AUTH): AppAuth {
 	return {
 		...base,
 		attributes: {
+			organizationId: task.organizationId,
 			taskKind: task.kind,
 			reason: task.reason,
 			budget: String(task.budget),

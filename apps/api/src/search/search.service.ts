@@ -19,13 +19,14 @@ const PER_KIND = 5;
 export class SearchService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async quick(q: string): Promise<{ hits: SearchHit[] }> {
+	async quick(organizationId: string, q: string): Promise<{ hits: SearchHit[] }> {
 		const term = q.trim();
 		if (term.length < 2) return { hits: [] };
 
 		const [companies, contacts, deals] = await Promise.all([
 			this.db.company.findMany({
 				where: {
+					organizationId,
 					OR: [
 						{ name: { contains: term, mode: "insensitive" } },
 						{ domain: { contains: term, mode: "insensitive" } },
@@ -44,6 +45,7 @@ export class SearchService {
 			}),
 			this.db.contact.findMany({
 				where: {
+					organizationId,
 					OR: [
 						{ firstName: { contains: term, mode: "insensitive" } },
 						{ lastName: { contains: term, mode: "insensitive" } },
@@ -62,7 +64,10 @@ export class SearchService {
 				},
 			}),
 			this.db.deal.findMany({
-				where: { name: { contains: term, mode: "insensitive" } },
+				where: {
+					organizationId,
+					name: { contains: term, mode: "insensitive" },
+				},
 				take: PER_KIND,
 				orderBy: [{ stage: "asc" }, { name: "asc" }],
 				select: {

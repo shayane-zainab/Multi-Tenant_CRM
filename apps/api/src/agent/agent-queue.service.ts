@@ -6,20 +6,21 @@ import { InjectDatabase } from "../database/database.constants";
 export class AgentQueueService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async queuedCompanies(ids: readonly string[]): Promise<Set<string>> {
-		return this.queued("companyId", ids);
+	async queuedCompanies(organizationId: string, ids: readonly string[]): Promise<Set<string>> {
+		return this.queued(organizationId, "companyId", ids);
 	}
 
-	async queuedContacts(ids: readonly string[]): Promise<Set<string>> {
-		return this.queued("contactId", ids);
+	async queuedContacts(organizationId: string, ids: readonly string[]): Promise<Set<string>> {
+		return this.queued(organizationId, "contactId", ids);
 	}
 
-	async isQueued(subject: {
-		companyId?: string;
-		contactId?: string;
-	}): Promise<boolean> {
+	async isQueued(
+		organizationId: string,
+		subject: { companyId?: string; contactId?: string },
+	): Promise<boolean> {
 		const row = await this.db.agentTask.findFirst({
 			where: {
+				organizationId,
 				finishedAt: null,
 				...(subject.companyId ? { companyId: subject.companyId } : {}),
 				...(subject.contactId ? { contactId: subject.contactId } : {}),
@@ -31,13 +32,14 @@ export class AgentQueueService {
 	}
 
 	private async queued(
+		organizationId: string,
 		column: "companyId" | "contactId",
 		ids: readonly string[],
 	): Promise<Set<string>> {
 		if (ids.length === 0) return new Set();
 
 		const rows = await this.db.agentTask.findMany({
-			where: { finishedAt: null, [column]: { in: [...ids] } },
+			where: { organizationId, finishedAt: null, [column]: { in: [...ids] } },
 			select: { [column]: true },
 			distinct: [column],
 		});

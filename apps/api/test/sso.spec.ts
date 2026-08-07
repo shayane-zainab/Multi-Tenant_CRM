@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isGoogleConfigured, WORKSPACE_ID } from "@crm/auth";
+import { isGoogleConfigured } from "@crm/auth";
 import type { Db } from "@crm/db";
 import { ForbiddenException } from "@nestjs/common";
 import { SsoService } from "../src/sso/sso.service";
@@ -19,6 +19,8 @@ const LIST = {
 	page: 1,
 	pageSize: 25,
 };
+
+const organizationId = "org_1";
 
 function service(role: string | null, rows: Row[] = []) {
 	const seen: { providerWhere?: unknown } = {};
@@ -54,21 +56,21 @@ describe("who may configure SSO", () => {
 	it("lets an owner and an admin", async () => {
 		for (const role of ["owner", "admin"]) {
 			const { sso } = service(role);
-			expect((await sso.settings("u1")).canConfigure).toBe(true);
+			expect((await sso.settings(organizationId, "u1")).canConfigure).toBe(true);
 		}
 	});
 
 	it("refuses a member, and refuses them the writes too", async () => {
 		const { sso } = service("member");
 
-		expect((await sso.settings("u1")).canConfigure).toBe(false);
+		expect((await sso.settings(organizationId, "u1")).canConfigure).toBe(false);
 
 		expect(
-			sso.remove("u1", new Headers(), { providerId: "okta" }),
+			sso.remove(organizationId, "u1", new Headers(), { providerId: "okta" }),
 		).rejects.toBeInstanceOf(ForbiddenException);
 
 		expect(
-			sso.register("u1", new Headers(), {
+			sso.register(organizationId, "u1", new Headers(), {
 				providerId: "okta",
 				issuer: "https://acme.okta.com",
 				domain: "acme.com",
@@ -80,14 +82,14 @@ describe("who may configure SSO", () => {
 
 	it("refuses somebody who is not in the workspace at all", async () => {
 		const { sso } = service(null);
-		expect((await sso.settings("u1")).canConfigure).toBe(false);
+		expect((await sso.settings(organizationId, "u1")).canConfigure).toBe(false);
 	});
 });
 
 describe("what a provider looks like once it is saved", () => {
 	it("never hands back the client secret", async () => {
 		const { sso } = service("owner", [OKTA]);
-		const [provider] = (await sso.list(LIST)).rows;
+		const [provider] = (await sso.list(organizationId, LIST)).rows;
 
 		expect(JSON.stringify(provider)).not.toContain("shhh");
 		expect(provider?.clientIdLastFour).toBe("WXYZ");
@@ -95,7 +97,7 @@ describe("what a provider looks like once it is saved", () => {
 
 	it("splits the domains and names the callback the IdP needs", async () => {
 		const { sso } = service("owner", [OKTA]);
-		const [provider] = (await sso.list(LIST)).rows;
+		const [provider] = (await sso.list(organizationId, LIST)).rows;
 
 		expect(provider?.domains).toEqual(["acme.com", "subsidiary.com"]);
 		expect(provider?.type).toBe("oidc");
@@ -105,17 +107,17 @@ describe("what a provider looks like once it is saved", () => {
 
 	it("reads only the one workspace, never an organization it was passed", async () => {
 		const { sso, seen } = service("owner", [OKTA]);
-		await sso.list(LIST);
+		await sso.list(organizationId, LIST);
 
-		expect(seen.providerWhere).toEqual({ organizationId: WORKSPACE_ID });
+		expect(seen.providerWhere).toEqual({ organizationId });
 	});
 
 	it("searches the name, the domain and the issuer", async () => {
 		const { sso, seen } = service("owner", [OKTA]);
-		await sso.list({ ...LIST, q: " acme " });
+		await sso.list(organizationId, { ...LIST, q: " acme " });
 
 		expect(seen.providerWhere).toEqual({
-			organizationId: WORKSPACE_ID,
+			organizationId,
 			OR: [
 				{ providerId: { contains: "acme", mode: "insensitive" } },
 				{ domain: { contains: "acme", mode: "insensitive" } },

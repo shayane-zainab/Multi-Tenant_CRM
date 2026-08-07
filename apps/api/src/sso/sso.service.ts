@@ -6,7 +6,6 @@ import {
 	ssoCallbackBase,
 	ssoCallbackURL,
 	ssoProviderName,
-	WORKSPACE_ID,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
@@ -135,30 +134,26 @@ export class SsoService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
 	async signInOptions(): Promise<SignInOptions> {
-		const rows = await this.db.ssoProvider.findMany({
-			where: { organizationId: WORKSPACE_ID },
-			select: { providerId: true },
-			orderBy: { providerId: "asc" },
-		});
-
+		// In a multi-tenant context, we cannot return SSO providers for an unknown org.
+		// A full SSO implementation would require an email-first flow to discover the org.
 		return {
 			google: isGoogleConfigured(),
-			providers: rows.map((row) => ({
-				providerId: row.providerId,
-				name: ssoProviderName(row.providerId),
-			})),
+			providers: [],
 		};
 	}
 
-	async settings(userId: string): Promise<SsoSettings> {
+	async settings(organizationId: string, userId: string): Promise<SsoSettings> {
 		return {
-			canConfigure: canConfigureSso(await this.roleOf(userId)),
+			canConfigure: canConfigureSso(await this.roleOf(organizationId, userId)),
 			callbackBase: ssoCallbackBase(),
 		};
 	}
 
-	async list(input: SsoProviderListInput): Promise<ListResult<SsoProvider>> {
-		const where = this.searchWhere(input.q);
+	async list(
+		organizationId: string,
+		input: SsoProviderListInput,
+	): Promise<ListResult<SsoProvider>> {
+		const where = this.searchWhere(organizationId, input.q);
 		const { skip, take } = paginate(input);
 
 		const [rows, total] = await Promise.all([
@@ -176,11 +171,12 @@ export class SsoService {
 	}
 
 	async register(
+		organizationId: string,
 		userId: string,
 		headers: Headers,
 		input: RegisterSsoProviderInput,
 	): Promise<SsoProvider> {
-		await this.requireConfigurer(userId);
+		await this.requireConfigurer(organizationId, userId);
 
 		const domains = splitDomains(input.domain);
 
@@ -197,7 +193,7 @@ export class SsoService {
 					providerId: input.providerId,
 					issuer: input.issuer,
 					domain: domains.join(","),
-					organizationId: WORKSPACE_ID,
+					organizationId,
 					oidcConfig: {
 						clientId: input.clientId,
 						clientSecret: input.clientSecret,
@@ -210,6 +206,7 @@ export class SsoService {
 		this.logger.log({
 			message: "SSO provider registered",
 			userId,
+			organizationId,
 			providerId: input.providerId,
 			issuer: input.issuer,
 		});
@@ -223,11 +220,12 @@ export class SsoService {
 	}
 
 	async remove(
+		organizationId: string,
 		userId: string,
 		headers: Headers,
 		input: DeleteSsoProviderInput,
 	): Promise<{ providerId: string }> {
-		await this.requireConfigurer(userId);
+		await this.requireConfigurer(organizationId, userId);
 
 		await this.call(() =>
 			auth.api.deleteSSOProvider({
@@ -239,16 +237,20 @@ export class SsoService {
 		this.logger.log({
 			message: "SSO provider removed",
 			userId,
+			organizationId,
 			providerId: input.providerId,
 		});
 
 		return { providerId: input.providerId };
 	}
 
-	private searchWhere(q: string): Prisma.SsoProviderWhereInput {
+	private searchWhere(
+		organizationId: string,
+		q: string,
+	): Prisma.SsoProviderWhereInput {
 		const term = q.trim();
 		const where: Prisma.SsoProviderWhereInput = {
-			organizationId: WORKSPACE_ID,
+			organizationId,
 		};
 
 		if (term) {
@@ -287,18 +289,24 @@ export class SsoService {
 		}
 	}
 
-	private async requireConfigurer(userId: string): Promise<void> {
-		if (!canConfigureSso(await this.roleOf(userId))) {
+	private async requireConfigurer(
+		organizationId: string,
+		userId: string,
+	): Promise<void> {
+		if (!canConfigureSso(await this.roleOf(organizationId, userId))) {
 			throw new ForbiddenException(
 				"Only an owner or an admin can change how people sign in.",
 			);
 		}
 	}
 
-	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
+	private async roleOf(
+		organizationId: string,
+		userId: string,
+	): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: { organizationId, userId },
 			},
 			select: { role: true },
 		});

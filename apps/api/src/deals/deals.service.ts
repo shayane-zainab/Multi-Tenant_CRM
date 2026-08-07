@@ -90,8 +90,8 @@ export class DealsService {
 		private readonly conversion: ConversionService,
 	) {}
 
-	async list(input: DealListInput) {
-		const where = this.buildWhere(input);
+	async list(organizationId: string, input: DealListInput) {
+		const where = this.buildWhere(organizationId, input);
 		const { skip, take } = paginate(input);
 
 		const openWhere = { ...where, stage: { in: [...OPEN_DEAL_STAGES] } };
@@ -120,7 +120,7 @@ export class DealsService {
 					},
 				}),
 				this.db.deal.count({ where }),
-				this.facetCounts(input),
+				this.facetCounts(organizationId, input),
 				this.db.deal.aggregate({
 					where: { AND: [openWhere, this.conversion.countedWhere(base)] },
 					_sum: { baseAmount: true },
@@ -160,11 +160,12 @@ export class DealsService {
 		};
 	}
 
-	async byId(id: string) {
+	async byId(organizationId: string, id: string) {
 		const deal = await this.db.deal.findUnique({
 			where: { id },
 			select: {
 				id: true,
+				organizationId: true,
 				name: true,
 				description: true,
 				stage: true,
@@ -198,11 +199,11 @@ export class DealsService {
 			},
 		});
 
-		if (!deal) {
+		if (!deal || deal.organizationId !== organizationId) {
 			throw new NotFoundException(`No deal with id ${id}.`);
 		}
 
-		const { contacts, amount, baseAmount, fxRate, fxRateAt, ...rest } = deal;
+		const { contacts, amount, baseAmount, fxRate, fxRateAt, organizationId: _, ...rest } = deal;
 
 		return {
 			...rest,
@@ -219,7 +220,7 @@ export class DealsService {
 		};
 	}
 
-	async create(input: DealCreateInput) {
+	async create(organizationId: string, input: DealCreateInput) {
 		const stage = input.stage ?? "DEMO_BOOKED";
 		const closed = isClosedStage(stage);
 		const now = new Date();
@@ -235,6 +236,7 @@ export class DealsService {
 		try {
 			const deal = await this.db.deal.create({
 				data: {
+					organizationId,
 					name: input.name.trim(),
 					companyId: input.companyId,
 					ownerId: input.ownerId,
@@ -249,7 +251,7 @@ export class DealsService {
 				select: { id: true, name: true, companyId: true },
 			});
 
-			this.logger.log({ message: "Deal created", dealId: deal.id, stage });
+			this.logger.log({ message: "Deal created", dealId: deal.id, stage, organizationId });
 
 			return deal;
 		} catch (error) {
@@ -257,7 +259,7 @@ export class DealsService {
 		}
 	}
 
-	async update(id: string, input: DealUpdateInput) {
+	async update(organizationId: string, id: string, input: DealUpdateInput) {
 		const data: Prisma.DealUpdateInput = {};
 
 		if (input.name !== undefined) data.name = input.name.trim();
@@ -284,10 +286,10 @@ export class DealsService {
 		if (input.amountCents !== undefined || input.currency !== undefined) {
 			const current = await this.db.deal.findUnique({
 				where: { id },
-				select: { amount: true, currency: true },
+				select: { amount: true, currency: true, organizationId: true },
 			});
 
-			if (!current) {
+			if (!current || current.organizationId !== organizationId) {
 				throw new NotFoundException(`No deal with id ${id}.`);
 			}
 
@@ -305,7 +307,7 @@ export class DealsService {
 
 		try {
 			return await this.db.deal.update({
-				where: { id },
+				where: { id, organizationId },
 				data,
 				select: { id: true, name: true },
 			});
@@ -314,19 +316,28 @@ export class DealsService {
 		}
 	}
 
-	async delete(id: string): Promise<{ id: string; name: string }> {
+	async delete(
+		organizationId: string,
+		id: string,
+	): Promise<{ id: string; name: string }> {
 		let deleted: { targets: StampTargets; name: string };
 
 		try {
 			deleted = await this.db.$transaction(async (tx) => {
-				const targets = await this.stamp.targetsOf({ dealId: id }, tx);
-
-				const deal = await tx.deal.delete({
+				const row = await tx.deal.findUnique({
 					where: { id },
-					select: { name: true },
+					select: { organizationId: true, name: true },
 				});
 
-				return { targets, name: deal.name };
+				if (!row || row.organizationId !== organizationId) {
+					throw new NotFoundException(`No deal with id ${id}.`);
+				}
+
+				const targets = await this.stamp.targetsOf({ dealId: id }, tx);
+
+				await tx.deal.delete({ where: { id } });
+
+				return { targets, name: row.name };
 			});
 		} catch (error) {
 			throw this.translate(error, id);
@@ -338,18 +349,23 @@ export class DealsService {
 			message: "Deal deleted",
 			dealId: id,
 			name: deleted.name,
+			organizationId,
 		});
 
 		return { id, name: deleted.name };
 	}
 
-	async setStage(input: SetStageInput, actingUserId: string) {
+	async setStage(
+		organizationId: string,
+		input: SetStageInput,
+		actingUserId: string,
+	) {
 		const deal = await this.db.deal.findUnique({
 			where: { id: input.id },
-			select: { id: true, stage: true, companyId: true },
+			select: { id: true, organizationId: true, stage: true, companyId: true },
 		});
 
-		if (!deal) {
+		if (!deal || deal.organizationId !== organizationId) {
 			throw new NotFoundException(`No deal with id ${input.id}.`);
 		}
 
@@ -380,6 +396,7 @@ export class DealsService {
 			}),
 			this.db.activity.create({
 				data: {
+					organizationId,
 					type: ActivityType.STAGE_CHANGE,
 					subject: "Stage changed",
 					body: closedReason ?? null,
@@ -402,16 +419,22 @@ export class DealsService {
 			dealId: deal.id,
 			from: deal.stage,
 			to: input.stage,
+			organizationId,
 		});
 
 		return { ...updated, changed: true };
 	}
 
-	private searchFilter(q: string): Prisma.DealWhereInput {
+	private searchFilter(
+		organizationId: string,
+		q: string,
+	): Prisma.DealWhereInput {
 		const term = q.trim();
-		if (!term) return {};
+		const base: Prisma.DealWhereInput = { organizationId };
+		if (!term) return base;
 
 		return {
+			...base,
 			OR: [
 				{ name: { contains: term, mode: "insensitive" } },
 				{ company: { name: { contains: term, mode: "insensitive" } } },
@@ -419,8 +442,11 @@ export class DealsService {
 		};
 	}
 
-	private buildWhere(input: DealListInput): Prisma.DealWhereInput {
-		const where: Prisma.DealWhereInput = this.searchFilter(input.q);
+	private buildWhere(
+		organizationId: string,
+		input: DealListInput,
+	): Prisma.DealWhereInput {
+		const where: Prisma.DealWhereInput = this.searchFilter(organizationId, input.q);
 
 		if (input.owner !== FACET_ALL) {
 			where.ownerId =
@@ -444,8 +470,11 @@ export class DealsService {
 		return where;
 	}
 
-	private async facetCounts(input: DealListInput) {
-		const where = this.searchFilter(input.q);
+	private async facetCounts(
+		organizationId: string,
+		input: DealListInput,
+	) {
+		const where = this.searchFilter(organizationId, input.q);
 
 		const [owners, stages, ...closingCounts] = await Promise.all([
 			this.db.deal.groupBy({ by: ["ownerId"], where, _count: { _all: true } }),

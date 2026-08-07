@@ -115,8 +115,11 @@ export class ContactsService {
 		private readonly stamp: ActivityStampService,
 	) {}
 
-	async list(input: ContactListInput): Promise<ListResult<ContactRow>> {
-		const where = this.buildWhere(input);
+	async list(
+		organizationId: string,
+		input: ContactListInput,
+	): Promise<ListResult<ContactRow>> {
+		const where = this.buildWhere(organizationId, input);
 		const { skip, take } = paginate(input);
 
 		const [rows, total, facetCounts] = await Promise.all([
@@ -140,7 +143,7 @@ export class ContactsService {
 				},
 			}),
 			this.db.contact.count({ where }),
-			this.facetCounts(input),
+			this.facetCounts(organizationId, input),
 		]);
 
 		return {
@@ -154,11 +157,12 @@ export class ContactsService {
 		};
 	}
 
-	async byId(id: string) {
+	async byId(organizationId: string, id: string) {
 		const contact = await this.db.contact.findUnique({
 			where: { id },
 			select: {
 				id: true,
+				organizationId: true,
 				firstName: true,
 				lastName: true,
 				email: true,
@@ -219,7 +223,7 @@ export class ContactsService {
 			},
 		});
 
-		if (!contact) {
+		if (!contact || contact.organizationId !== organizationId) {
 			throw new NotFoundException(`No contact with id ${id}.`);
 		}
 
@@ -228,7 +232,7 @@ export class ContactsService {
 			contact.company?.id ?? null,
 		);
 
-		const { deals, createdAt, brief, facts, company, ...rest } = contact;
+		const { deals, createdAt, brief, facts, company, organizationId: _, ...rest } = contact;
 
 		return {
 			...rest,
@@ -259,12 +263,15 @@ export class ContactsService {
 		};
 	}
 
-	async create(input: ContactCreateInput) {
+	async create(organizationId: string, input: ContactCreateInput) {
 		const email = normalizeEmail(input.email ?? "");
 
 		if (email) {
 			const existing = await this.db.contact.findFirst({
-				where: { email: { equals: email, mode: "insensitive" } },
+				where: {
+					organizationId,
+					email: { equals: email, mode: "insensitive" },
+				},
 				select: { id: true, firstName: true, lastName: true },
 			});
 			if (existing) {
@@ -277,7 +284,7 @@ export class ContactsService {
 		const companyId =
 			input.companyId ??
 			(email
-				? await this.companies.companyForEmail(email, {
+				? await this.companies.companyForEmail(organizationId, email, {
 						ownerId: input.ownerId,
 					})
 				: null);
@@ -287,6 +294,7 @@ export class ContactsService {
 
 			return tx.contact.create({
 				data: {
+					organizationId,
 					firstName: input.firstName.trim(),
 					lastName: blankToNull(input.lastName ?? ""),
 					email,
@@ -299,9 +307,10 @@ export class ContactsService {
 			});
 		});
 
-		this.logger.log({ message: "Contact created", contactId: contact.id });
+		this.logger.log({ message: "Contact created", contactId: contact.id, organizationId });
 
 		await this.agent.contactCreated(
+			organizationId,
 			contact.id,
 			"Added by a rep, with nothing on the record yet",
 		);
@@ -309,7 +318,10 @@ export class ContactsService {
 		return contact;
 	}
 
-	async delete(id: string): Promise<{ id: string; name: string }> {
+	async delete(
+		organizationId: string,
+		id: string,
+	): Promise<{ id: string; name: string }> {
 		let deleted: {
 			targets: StampTargets;
 			name: string;
@@ -318,6 +330,15 @@ export class ContactsService {
 
 		try {
 			deleted = await this.db.$transaction(async (tx) => {
+				const row = await tx.contact.findUnique({
+					where: { id },
+					select: { organizationId: true },
+				});
+
+				if (!row || row.organizationId !== organizationId) {
+					throw new NotFoundException(`No contact with id ${id}.`);
+				}
+
 				const targets = await this.stamp.targetsOf({ contactId: id }, tx);
 
 				await tx.agentTask.deleteMany({ where: { contactId: id } });
@@ -356,12 +377,13 @@ export class ContactsService {
 			message: "Contact deleted",
 			contactId: id,
 			suppressed: deleted.suppressed,
+			organizationId,
 		});
 
 		return { id, name: deleted.name };
 	}
 
-	async update(id: string, input: ContactUpdateInput) {
+	async update(organizationId: string, id: string, input: ContactUpdateInput) {
 		const data: Prisma.ContactUpdateInput = {};
 
 		if (input.firstName !== undefined) data.firstName = input.firstName.trim();
@@ -393,7 +415,7 @@ export class ContactsService {
 		try {
 			return await this.db.$transaction(async (tx) => {
 				const updated = await tx.contact.update({
-					where: { id },
+					where: { id, organizationId },
 					data,
 					select: { id: true, firstName: true, lastName: true },
 				});
@@ -483,13 +505,16 @@ export class ContactsService {
 		};
 	}
 
-	async enrich(id: string): Promise<{ id: string; queued: true }> {
+	async enrich(
+		organizationId: string,
+		id: string,
+	): Promise<{ id: string; queued: true }> {
 		const contact = await this.db.contact.findUnique({
 			where: { id },
-			select: { id: true, imageUrl: true, linkedinUrl: true },
+			select: { id: true, organizationId: true, imageUrl: true, linkedinUrl: true },
 		});
 
-		if (!contact) {
+		if (!contact || contact.organizationId !== organizationId) {
 			throw new NotFoundException(`No contact with id ${id}.`);
 		}
 
@@ -499,6 +524,7 @@ export class ContactsService {
 		});
 
 		await this.agent.contactCreated(
+			organizationId,
 			id,
 			contact.linkedinUrl && !contact.imageUrl
 				? "A rep asked for a fresh look — they have a LinkedIn profile on file but no picture"
@@ -509,6 +535,7 @@ export class ContactsService {
 	}
 
 	async decideFact(
+		organizationId: string,
 		input: FactDecisionInput,
 		userId: string,
 	): Promise<{ contactId: string; field: string; applied: boolean }> {
@@ -520,10 +547,11 @@ export class ContactsService {
 				field: true,
 				value: true,
 				status: true,
+				contact: { select: { organizationId: true } },
 			},
 		});
 
-		if (!fact) {
+		if (!fact || fact.contact.organizationId !== organizationId) {
 			throw new NotFoundException(`No fact with id ${input.factId}.`);
 		}
 
@@ -582,16 +610,22 @@ export class ContactsService {
 			contactId: fact.contactId,
 			field: fact.field,
 			decision: input.decision,
+			organizationId,
 		});
 
 		return { contactId: fact.contactId, field: fact.field, applied: accepted };
 	}
 
-	private searchFilter(q: string): Prisma.ContactWhereInput {
+	private searchFilter(
+		organizationId: string,
+		q: string,
+	): Prisma.ContactWhereInput {
 		const term = q.trim();
-		if (!term) return {};
+		const base: Prisma.ContactWhereInput = { organizationId };
+		if (!term) return base;
 
 		return {
+			...base,
 			OR: [
 				{ firstName: { contains: term, mode: "insensitive" } },
 				{ lastName: { contains: term, mode: "insensitive" } },
@@ -601,9 +635,12 @@ export class ContactsService {
 		};
 	}
 
-	private buildWhere(input: ContactListInput): Prisma.ContactWhereInput {
+	private buildWhere(
+		organizationId: string,
+		input: ContactListInput,
+	): Prisma.ContactWhereInput {
 		const where: Prisma.ContactWhereInput = {
-			...this.searchFilter(input.q),
+			...this.searchFilter(organizationId, input.q),
 			...ownerFilter(input.owner),
 		};
 
@@ -618,8 +655,11 @@ export class ContactsService {
 		return where;
 	}
 
-	private async facetCounts(input: ContactListInput) {
-		const where = this.searchFilter(input.q);
+	private async facetCounts(
+		organizationId: string,
+		input: ContactListInput,
+	) {
+		const where = this.searchFilter(organizationId, input.q);
 
 		const [owners, companies, sources] = await Promise.all([
 			this.db.contact.groupBy({

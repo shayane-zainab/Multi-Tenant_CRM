@@ -6,10 +6,8 @@ export {
 	canManageCurrency,
 	canRenameWorkspace,
 	DEFAULT_WORKSPACE_NAME,
-	ensureWorkspaceMembership,
 	isWorkspaceAdmin,
 	isWorkspaceRole,
-	WORKSPACE_ID,
 	WORKSPACE_ROLES,
 	type WorkspaceRole,
 } from "./organization";

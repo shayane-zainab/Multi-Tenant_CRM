@@ -73,8 +73,11 @@ export class ActivitiesService {
 		private readonly stamp: ActivityStampService,
 	) {}
 
-	async timeline(input: TimelineInput) {
-		const where = this.anchor(input);
+	async timeline(organizationId: string, input: TimelineInput) {
+		const where: Prisma.ActivityWhereInput = {
+			organizationId,
+			...this.anchor(input),
+		};
 		Object.assign(where, filterClause(input.filter));
 
 		const rows = await this.db.activity.findMany({
@@ -98,9 +101,13 @@ export class ActivitiesService {
 	}
 
 	async timelineCounts(
+		organizationId: string,
 		input: Pick<TimelineInput, "companyId" | "contactId" | "dealId">,
 	) {
-		const anchor = this.anchor(input);
+		const anchor: Prisma.ActivityWhereInput = {
+			organizationId,
+			...this.anchor(input),
+		};
 
 		const [all, notes, upcoming, done, email, meetings] = await Promise.all([
 			this.db.activity.count({ where: anchor }),
@@ -122,13 +129,18 @@ export class ActivitiesService {
 		return { all, notes, upcoming, done, email, meetings };
 	}
 
-	async create(input: ActivityCreateInput, actingUserId: string) {
+	async create(
+		organizationId: string,
+		input: ActivityCreateInput,
+		actingUserId: string,
+	) {
 		const companyId = await this.resolveCompanyId(input);
 
 		const isTask = input.type === ActivityType.TASK;
 
 		const activity = await this.db.activity.create({
 			data: {
+				organizationId,
 				type: input.type,
 				subject: blankToNull(input.subject ?? ""),
 				body: blankToNull(input.body ?? ""),
@@ -151,18 +163,19 @@ export class ActivitiesService {
 			message: "Activity logged",
 			activityId: activity.id,
 			type: activity.type,
+			organizationId,
 		});
 
 		return serializeEntry(activity);
 	}
 
-	async complete(id: string, completed: boolean) {
+	async complete(organizationId: string, id: string, completed: boolean) {
 		const activity = await this.db.activity.findUnique({
 			where: { id },
-			select: { type: true },
+			select: { type: true, organizationId: true },
 		});
 
-		if (!activity) {
+		if (!activity || activity.organizationId !== organizationId) {
 			throw new NotFoundException(`No activity with id ${id}.`);
 		}
 
@@ -179,9 +192,14 @@ export class ActivitiesService {
 		return serializeEntry(updated);
 	}
 
-	async myTasks(input: MyTasksInput, actingUserId: string) {
+	async myTasks(
+		organizationId: string,
+		input: MyTasksInput,
+		actingUserId: string,
+	) {
 		const now = new Date();
 		const where: Prisma.ActivityWhereInput = {
+			organizationId,
 			type: ActivityType.TASK,
 			completedAt: null,
 			createdById: actingUserId,

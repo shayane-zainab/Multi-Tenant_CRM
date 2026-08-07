@@ -18,6 +18,6 @@ export class DashboardRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof dashboardSummaryInput>,
 	) {
-		return this.dashboard.summary(ctx.user.id, input);
+		return this.dashboard.summary(ctx.organizationId, ctx.user.id, input);
 	}
 }

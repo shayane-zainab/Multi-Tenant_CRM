@@ -31,7 +31,7 @@ export class ConversationsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof conversationListInput>,
 	) {
-		return this.conversations.list(input, ctx.user.id);
+		return this.conversations.list(ctx.organizationId, input, ctx.user.id);
 	}
 
 	@Query({ input: conversationEventsInput })
@@ -39,7 +39,7 @@ export class ConversationsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof conversationEventsInput>,
 	) {
-		return this.conversations.events(input, ctx.user.id);
+		return this.conversations.events(ctx.organizationId, input, ctx.user.id);
 	}
 
 	@Mutation({ input: conversationSaveInput })
@@ -47,11 +47,11 @@ export class ConversationsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof conversationSaveInput>,
 	) {
-		return this.conversations.save(input, ctx.user.id);
+		return this.conversations.save(ctx.organizationId, input, ctx.user.id);
 	}
 
 	@Mutation({ input: conversationIdInput })
 	async remove(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
-		return this.conversations.remove(id, ctx.user.id);
+		return this.conversations.remove(ctx.organizationId, id, ctx.user.id);
 	}
 }

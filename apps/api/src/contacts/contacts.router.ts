@@ -27,33 +27,42 @@ export class ContactsRouter {
 	) {}
 
 	@Query({ input: contactListInput })
-	async list(@Input() input: z.infer<typeof contactListInput>) {
-		return this.contacts.list(input);
+	async list(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof contactListInput>,
+	) {
+		return this.contacts.list(ctx.organizationId, input);
 	}
 
 	@Query({ input: contactIdInput })
-	async byId(@Input("id") id: string) {
-		return this.contacts.byId(id);
+	async byId(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		return this.contacts.byId(ctx.organizationId, id);
 	}
 
 	@Mutation({ input: contactCreateInput })
-	async create(@Input() input: z.infer<typeof contactCreateInput>) {
-		return this.contacts.create(input);
+	async create(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof contactCreateInput>,
+	) {
+		return this.contacts.create(ctx.organizationId, input);
 	}
 
 	@Mutation({ input: contactUpdateArgs })
-	async update(@Input() input: z.infer<typeof contactUpdateArgs>) {
-		return this.contacts.update(input.id, input.data);
+	async update(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof contactUpdateArgs>,
+	) {
+		return this.contacts.update(ctx.organizationId, input.id, input.data);
 	}
 
 	@Mutation({ input: contactIdInput })
-	async delete(@Input("id") id: string) {
-		return this.contacts.delete(id);
+	async delete(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		return this.contacts.delete(ctx.organizationId, id);
 	}
 
 	@Mutation({ input: contactIdInput })
-	async enrich(@Input("id") id: string) {
-		return this.contacts.enrich(id);
+	async enrich(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		return this.contacts.enrich(ctx.organizationId, id);
 	}
 
 	@Mutation({ input: factDecisionInput })
@@ -61,6 +70,6 @@ export class ContactsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof factDecisionInput>,
 	) {
-		return this.contacts.decideFact(input, ctx.user.id);
+		return this.contacts.decideFact(ctx.organizationId, input, ctx.user.id);
 	}
 }

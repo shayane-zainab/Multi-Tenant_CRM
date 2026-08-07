@@ -40,6 +40,7 @@ export class ConversationsService {
 	) {}
 
 	async list(
+		organizationId: string,
 		input: ConversationListInput,
 		userId: string,
 	): Promise<ConversationSummary[]> {
@@ -53,6 +54,7 @@ export class ConversationsService {
 
 		const rows = await this.db.agentConversation.findMany({
 			where: {
+				organizationId,
 				userId,
 				...(input.contactId ? { contactId: input.contactId } : {}),
 				...(input.companyId ? { companyId: input.companyId } : {}),
@@ -82,6 +84,7 @@ export class ConversationsService {
 	}
 
 	async save(
+		organizationId: string,
 		input: ConversationSaveInput,
 		userId: string,
 	): Promise<{ id: string }> {
@@ -96,6 +99,7 @@ export class ConversationsService {
 				title: input.title?.slice(0, 120) ?? null,
 				messageCount: input.messageCount ?? 0,
 				userId,
+				organizationId,
 				contactId: input.contactId ?? null,
 				companyId: input.companyId ?? null,
 				dealId: input.dealId ?? null,
@@ -120,9 +124,9 @@ export class ConversationsService {
 		return { id: conversation.id };
 	}
 
-	async events(input: ConversationEventsInput, userId: string) {
-		const conversation = await this.db.agentConversation.findUnique({
-			where: { id: input.id },
+	async events(organizationId: string, input: ConversationEventsInput, userId: string) {
+		const conversation = await this.db.agentConversation.findFirst({
+			where: { id: input.id, organizationId },
 			select: { sessionId: true, userId: true },
 		});
 
@@ -144,9 +148,9 @@ export class ConversationsService {
 		}));
 	}
 
-	async remove(id: string, userId: string): Promise<{ id: string }> {
-		const conversation = await this.db.agentConversation.findUnique({
-			where: { id },
+	async remove(organizationId: string, id: string, userId: string): Promise<{ id: string }> {
+		const conversation = await this.db.agentConversation.findFirst({
+			where: { id, organizationId },
 			select: {
 				id: true,
 				userId: true,

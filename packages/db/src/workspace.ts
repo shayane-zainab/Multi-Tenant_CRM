@@ -1,8 +1,6 @@
 import type { Db } from "./client";
 import type { WorkspaceProfileSections } from "./json";
 
-export const WORKSPACE_ID = "workspace";
-
 export const DEFAULT_WORKSPACE_SLUG = "workspace";
 
 export const MAX_SLUG = 48;
@@ -84,9 +82,10 @@ export type WorkspaceIdentity = {
 
 export async function readWorkspaceProfile(
 	db: Db,
+	organizationId: string,
 ): Promise<WorkspaceProfile | null> {
 	const row = await db.workspaceProfile.findUnique({
-		where: { id: WORKSPACE_ID },
+		where: { organizationId },
 		select: {
 			website: true,
 			narrative: true,
@@ -133,13 +132,14 @@ export function profileOf(
 
 export async function readWorkspaceIdentity(
 	db: Db,
+	organizationId: string,
 ): Promise<WorkspaceIdentity | null> {
 	const [workspace, profile] = await Promise.all([
 		db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: organizationId },
 			select: { name: true, website: true },
 		}),
-		readWorkspaceProfile(db),
+		readWorkspaceProfile(db, organizationId),
 	]);
 
 	if (!workspace) return null;
@@ -153,6 +153,7 @@ export async function readWorkspaceIdentity(
 
 export async function writeWorkspaceProfile(
 	db: Db,
+	organizationId: string,
 	input: {
 		website: string;
 		narrative: string;
@@ -171,8 +172,8 @@ export async function writeWorkspaceProfile(
 	};
 
 	const row = await db.workspaceProfile.upsert({
-		where: { id: WORKSPACE_ID },
-		create: { id: WORKSPACE_ID, ...fields },
+		where: { organizationId },
+		create: { organizationId, ...fields },
 		update: fields,
 		select: {
 			website: true,

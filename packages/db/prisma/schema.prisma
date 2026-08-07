@@ -1,4 +1,3 @@
-
 datasource db {
   provider = "postgresql"
 }
@@ -31,10 +30,9 @@ model User {
   factDecisions  ContactFact[]       @relation("FactDecider")
   conversations  AgentConversation[] @relation("ConversationOwner")
 
-  members     Member[]
-  invitations Invitation[]
-
   ssoproviders SsoProvider[]
+  members      Member[]
+  invitations  Invitation[]
 
   @@unique([email])
   @@map("user")
@@ -138,7 +136,7 @@ enum RecordSource {
 model Company {
   id          String  @id @default(cuid())
   name        String
-  domain      String? @unique
+  domain      String?
   website     String?
   description String?
 
@@ -186,10 +184,14 @@ model Company {
   calendarEvents CalendarEvent[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@unique([organizationId, domain])
   @@index([ownerId])
   @@index([name])
   @@index([lastActivityAt])
+  @@index([organizationId])
   @@map("company")
 }
 
@@ -207,7 +209,7 @@ model Contact {
   id          String  @id @default(cuid())
   firstName   String
   lastName    String?
-  email       String? @unique
+  email       String?
   phone       String?
   title       String?
   linkedinUrl String?
@@ -242,10 +244,14 @@ model Contact {
   eventAttendance CalendarAttendee[]
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+  organizationId  String
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@unique([organizationId, email])
   @@index([companyId])
   @@index([ownerId])
   @@index([lastActivityAt])
+  @@index([organizationId])
   @@map("contact")
 }
 
@@ -329,10 +335,13 @@ model AgentTask {
   finishedAt DateTime?
   outcome    String?
 
-  createdAt DateTime @default(now())
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([dueAt, leasedUntil])
   @@index([contactId])
+  @@index([organizationId])
   @@map("agentTask")
 }
 
@@ -370,12 +379,15 @@ model AgentConversation {
   title        String?
   messageCount Int     @default(0)
 
-  createdAt     DateTime @default(now())
-  lastMessageAt DateTime @default(now())
+  createdAt      DateTime     @default(now())
+  lastMessageAt  DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([contactId, lastMessageAt])
   @@index([companyId, lastMessageAt])
   @@index([dealId, lastMessageAt])
+  @@index([organizationId])
   @@map("agentConversation")
 }
 
@@ -404,10 +416,12 @@ model Deal {
 
   lastActivityAt DateTime?
 
-  contacts   DealContact[]
-  activities Activity[]
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  contacts       DealContact[]
+  activities     Activity[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([ownerId])
@@ -416,6 +430,7 @@ model Deal {
   @@index([lastActivityAt])
   @@index([baseAmount])
   @@index([currency])
+  @@index([organizationId])
   @@map("deal")
 }
 
@@ -478,14 +493,17 @@ model Activity {
   calendarEventId String?        @unique
   calendarEvent   CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([companyId, createdAt])
   @@index([dealId, createdAt])
   @@index([contactId, createdAt])
   @@index([dueAt])
   @@index([createdById])
+  @@index([organizationId])
   @@map("activity")
 }
 
@@ -514,17 +532,20 @@ model MailboxSync {
   retryAfter   DateTime?
   autoCreate   Boolean          @default(false)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, source])
   @@index([status])
+  @@index([organizationId])
   @@map("mailboxSync")
 }
 
 model EmailThread {
   id            String  @id @default(cuid())
-  rootMessageId String  @unique
+  rootMessageId String
   subject       String?
 
   companyId String?
@@ -539,11 +560,15 @@ model EmailThread {
   messages EmailMessage[]
   activity Activity?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@unique([organizationId, rootMessageId])
   @@index([companyId, lastMessageAt])
   @@index([contactId, lastMessageAt])
+  @@index([organizationId])
   @@map("emailThread")
 }
 
@@ -552,7 +577,7 @@ model EmailMessage {
   threadId String
   thread   EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
-  rfcMessageId   String  @unique
+  rfcMessageId   String
   syncedByUserId String?
   gmailMessageId String?
 
@@ -567,6 +592,7 @@ model EmailMessage {
 
   createdAt DateTime @default(now())
 
+  @@unique([threadId, rfcMessageId])
   @@index([threadId, sentAt])
   @@map("emailMessage")
 }
@@ -598,12 +624,15 @@ model CalendarEvent {
   attendees CalendarAttendee[]
   activity  Activity?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([iCalUid, originalStartTime])
+  @@unique([organizationId, iCalUid, originalStartTime])
   @@index([companyId, startsAt])
   @@index([contactId, startsAt])
+  @@index([organizationId])
   @@map("calendarEvent")
 }
 
@@ -625,23 +654,30 @@ model CalendarAttendee {
 }
 
 model SuppressedDomain {
-  domain    String   @id
-  reason    String?
-  createdAt DateTime @default(now())
+  domain         String       @id
+  reason         String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@map("suppressedDomain")
 }
 
 model SuppressedContact {
-  email     String   @id
-  reason    String?
-  createdAt DateTime @default(now())
+  email          String       @id
+  reason         String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@map("suppressedContact")
 }
 
-model AppSetting {
-  id String @id
+model OrgSetting {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   agentModelId String?
 
@@ -655,7 +691,7 @@ model AppSetting {
 
   updatedAt DateTime @updatedAt
 
-  @@map("appSetting")
+  @@map("orgSetting")
 }
 
 model Install {
@@ -688,22 +724,36 @@ model TelemetryCounter {
 }
 
 model Organization {
-  id          String       @id
-  name        String
-  slug        String
-  logo        String?
-  createdAt   DateTime
-  metadata    String?
-  website     String?
-  members     Member[]
-  invitations Invitation[]
+  id                 String              @id
+  name               String
+  slug               String
+  logo               String?
+  createdAt          DateTime
+  metadata           String?
+  website            String?
+  companies          Company[]
+  contacts           Contact[]
+  agentTasks         AgentTask[]
+  agentConversations AgentConversation[]
+  deals              Deal[]
+  activities         Activity[]
+  mailboxSyncs       MailboxSync[]
+  emailThreads       EmailThread[]
+  calendarEvents     CalendarEvent[]
+  suppressedDomains  SuppressedDomain[]
+  suppressedContacts SuppressedContact[]
+  orgSettings        OrgSetting[]
+  workspaceProfiles  WorkspaceProfile[]
+  members            Member[]
+  invitations        Invitation[]
 
   @@unique([slug])
   @@map("organization")
 }
 
 model WorkspaceProfile {
-  id String @id
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   website   String
   narrative String

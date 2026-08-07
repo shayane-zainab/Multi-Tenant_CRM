@@ -13,10 +13,11 @@ export class AgentTriggerService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
 	async companyCreated(
+		organizationId: string,
 		companyId: string,
 		reason = "New company",
 	): Promise<void> {
-		await this.enqueue({
+		await this.enqueue(organizationId, {
 			companyId,
 			kind: "brand",
 			reason,
@@ -24,7 +25,7 @@ export class AgentTriggerService {
 			budget: 2,
 		});
 
-		await this.enqueue({
+		await this.enqueue(organizationId, {
 			companyId,
 			kind: "company-profile",
 			reason,
@@ -33,8 +34,8 @@ export class AgentTriggerService {
 		});
 	}
 
-	async companyRequested(companyId: string, reason: string): Promise<void> {
-		await this.enqueue({
+	async companyRequested(organizationId: string, companyId: string, reason: string): Promise<void> {
+		await this.enqueue(organizationId, {
 			companyId,
 			kind: "brand",
 			reason,
@@ -42,7 +43,7 @@ export class AgentTriggerService {
 			budget: 2,
 		});
 
-		await this.enqueue({
+		await this.enqueue(organizationId, {
 			companyId,
 			kind: "company-profile",
 			reason,
@@ -51,8 +52,8 @@ export class AgentTriggerService {
 		});
 	}
 
-	async workspaceChanged(website: string, reason: string): Promise<void> {
-		await this.enqueue({
+	async workspaceChanged(organizationId: string, website: string, reason: string): Promise<void> {
+		await this.enqueue(organizationId, {
 			kind: "workspace-profile",
 			reason: `${reason} (${website})`,
 			priority: PRIORITY.workspace,
@@ -60,8 +61,8 @@ export class AgentTriggerService {
 		});
 	}
 
-	async contactCreated(contactId: string, reason: string): Promise<void> {
-		await this.enqueue({
+	async contactCreated(organizationId: string, contactId: string, reason: string): Promise<void> {
+		await this.enqueue(organizationId, {
 			contactId,
 			kind: "identify",
 			reason,
@@ -70,8 +71,8 @@ export class AgentTriggerService {
 		});
 	}
 
-	async meetingSoon(contactId: string, when: Date): Promise<void> {
-		await this.enqueue({
+	async meetingSoon(organizationId: string, contactId: string, when: Date): Promise<void> {
+		await this.enqueue(organizationId, {
 			contactId,
 			kind: "meeting-prep",
 			reason: `Meeting on ${when.toDateString()} with someone we know nothing about`,
@@ -80,7 +81,7 @@ export class AgentTriggerService {
 		});
 	}
 
-	async backfill(input: {
+	async backfill(organizationId: string, input: {
 		kind: string;
 		reason: string;
 		contactIds?: string[];
@@ -95,6 +96,7 @@ export class AgentTriggerService {
 		try {
 			const outstanding = await this.db.agentTask.findMany({
 				where: {
+					organizationId,
 					kind: input.kind,
 					finishedAt: null,
 					[subject]: { in: ids },
@@ -110,6 +112,7 @@ export class AgentTriggerService {
 			if (fresh.length > 0) {
 				await this.db.agentTask.createMany({
 					data: fresh.map((id) => ({
+						organizationId,
 						contactId: input.contactIds ? id : null,
 						companyId: input.companyIds ? id : null,
 						kind: input.kind,
@@ -143,7 +146,7 @@ export class AgentTriggerService {
 		}
 	}
 
-	private async enqueue(task: {
+	private async enqueue(organizationId: string, task: {
 		contactId?: string;
 		companyId?: string;
 		kind: string;
@@ -154,6 +157,7 @@ export class AgentTriggerService {
 		try {
 			const pending = await this.db.agentTask.findFirst({
 				where: {
+					organizationId,
 					kind: task.kind,
 					finishedAt: null,
 					...(task.contactId ? { contactId: task.contactId } : {}),
@@ -166,6 +170,7 @@ export class AgentTriggerService {
 
 			await this.db.agentTask.create({
 				data: {
+					organizationId,
 					contactId: task.contactId ?? null,
 					companyId: task.companyId ?? null,
 					kind: task.kind,

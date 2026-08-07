@@ -25,28 +25,37 @@ export class DealsRouter {
 	constructor(@Inject(DealsService) private readonly deals: DealsService) {}
 
 	@Query({ input: dealListInput })
-	async list(@Input() input: z.infer<typeof dealListInput>) {
-		return this.deals.list(input);
+	async list(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof dealListInput>,
+	) {
+		return this.deals.list(ctx.organizationId, input);
 	}
 
 	@Query({ input: dealIdInput })
-	async byId(@Input("id") id: string) {
-		return this.deals.byId(id);
+	async byId(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		return this.deals.byId(ctx.organizationId, id);
 	}
 
 	@Mutation({ input: dealCreateInput })
-	async create(@Input() input: z.infer<typeof dealCreateInput>) {
-		return this.deals.create(input);
+	async create(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof dealCreateInput>,
+	) {
+		return this.deals.create(ctx.organizationId, input);
 	}
 
 	@Mutation({ input: dealUpdateArgs })
-	async update(@Input() input: z.infer<typeof dealUpdateArgs>) {
-		return this.deals.update(input.id, input.data);
+	async update(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof dealUpdateArgs>,
+	) {
+		return this.deals.update(ctx.organizationId, input.id, input.data);
 	}
 
 	@Mutation({ input: dealIdInput })
-	async delete(@Input("id") id: string) {
-		return this.deals.delete(id);
+	async delete(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		return this.deals.delete(ctx.organizationId, id);
 	}
 
 	@Mutation({ input: setStageInput })
@@ -54,6 +63,6 @@ export class DealsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof setStageInput>,
 	) {
-		return this.deals.setStage(input, ctx.user.id);
+		return this.deals.setStage(ctx.organizationId, input, ctx.user.id);
 	}
 }

@@ -210,7 +210,10 @@ export class GmailSyncService {
 		if (ids.length === 0) return { written: 0, remaining: 0 };
 
 		const alreadyHave = await this.db.emailMessage.findMany({
-			where: { gmailMessageId: { in: [...ids] } },
+			where: { 
+				gmailMessageId: { in: [...ids] },
+				thread: { organizationId: row.organizationId }
+			},
 			select: { gmailMessageId: true },
 		});
 		const seen = new Set(
@@ -224,9 +227,9 @@ export class GmailSyncService {
 		if (batch.length === 0) return { written: 0, remaining };
 
 		const [internal, suppressedDomains, suppressedEmails] = await Promise.all([
-			this.match.internalIdentity(),
-			this.match.suppressedDomains(),
-			this.match.suppressedEmails(),
+			this.match.internalIdentity(row.organizationId),
+			this.match.suppressedDomains(row.organizationId),
+			this.match.suppressedEmails(row.organizationId),
 		]);
 
 		const context = {
@@ -258,8 +261,8 @@ export class GmailSyncService {
 		const parsed = this.parse(message);
 		if (!parsed) return false;
 
-		const existing = await this.db.emailMessage.findUnique({
-			where: { rfcMessageId: parsed.rfcMessageId },
+		const existing = await this.db.emailMessage.findFirst({
+			where: { rfcMessageId: parsed.rfcMessageId, thread: { organizationId: row.organizationId } },
 			select: { id: true },
 		});
 		if (existing) return false;
@@ -268,7 +271,12 @@ export class GmailSyncService {
 		const outbound = parsed.from.email === mailbox;
 
 		const thread = await this.db.emailThread.findUnique({
-			where: { rootMessageId: parsed.rootId },
+			where: {
+				organizationId_rootMessageId: {
+					organizationId: row.organizationId,
+					rootMessageId: parsed.rootId,
+				},
+			},
 			select: { id: true, companyId: true, contactId: true },
 		});
 
@@ -281,6 +289,7 @@ export class GmailSyncService {
 
 			const match = await this.match.resolve(
 				{
+					organizationId: row.organizationId,
 					participants,
 					allowCreate: row.autoCreate && repliedTo,
 					source: RecordSource.EMAIL,
@@ -298,8 +307,14 @@ export class GmailSyncService {
 		}
 
 		const record = await this.db.emailThread.upsert({
-			where: { rootMessageId: parsed.rootId },
+			where: {
+				organizationId_rootMessageId: {
+					organizationId: row.organizationId,
+					rootMessageId: parsed.rootId,
+				},
+			},
 			create: {
+				organizationId: row.organizationId,
 				rootMessageId: parsed.rootId,
 				subject: parsed.subject,
 				companyId,
@@ -349,7 +364,7 @@ export class GmailSyncService {
 			},
 		});
 
-		await this.project(record.id, row.userId, {
+		await this.project(row.organizationId, record.id, row.userId, {
 			subject: parsed.subject ?? "(no subject)",
 			snippet: snippetOf(parsed.body),
 			lastMessageAt,
@@ -376,6 +391,7 @@ export class GmailSyncService {
 	}
 
 	private async project(
+		organizationId: string,
 		emailThreadId: string,
 		userId: string,
 		summary: {
@@ -389,6 +405,7 @@ export class GmailSyncService {
 		const activity = await this.db.activity.upsert({
 			where: { emailThreadId },
 			create: {
+				organizationId,
 				type: ActivityType.EMAIL,
 				subject: summary.subject,
 				body: summary.snippet,

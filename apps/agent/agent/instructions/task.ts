@@ -8,6 +8,7 @@ export default defineDynamic({
 			const attributes = ctx.session.auth.current?.attributes ?? {};
 			const budget = asNumber(attributes.budget);
 			const kind = asString(attributes.taskKind);
+			const organizationId = asString(attributes.organizationId);
 
 			if (budget) setBudget(budget);
 
@@ -25,7 +26,7 @@ export default defineDynamic({
 				},
 			);
 
-			focusOn({ ...focus, sessionId: ctx.session.id });
+			focusOn({ ...focus, sessionId: ctx.session.id, organizationId });
 
 			return defineInstructions({ markdown });
 		},

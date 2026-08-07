@@ -14,6 +14,7 @@ export class CompanyDirectoryService {
 	) {}
 
 	async companyForEmail(
+		organizationId: string,
 		email: string,
 		options: { ownerId?: string | null } = {},
 	): Promise<string | null> {
@@ -21,14 +22,15 @@ export class CompanyDirectoryService {
 		if (!domain) return null;
 
 		const existing = await this.db.company.findUnique({
-			where: { domain },
+			where: { organizationId_domain: { organizationId, domain } },
 			select: { id: true },
 		});
 		if (existing) return existing.id;
 
 		const company = await this.db.company.upsert({
-			where: { domain },
+			where: { organizationId_domain: { organizationId, domain } },
 			create: {
+				organizationId,
 				name: domain,
 				domain,
 				website: `https://${domain}`,
@@ -40,6 +42,7 @@ export class CompanyDirectoryService {
 		});
 
 		await this.agent.companyCreated(
+			organizationId,
 			company.id,
 			`Created from an email domain (${domain}) — it has no name but the domain`,
 		);
@@ -48,6 +51,7 @@ export class CompanyDirectoryService {
 			message: "Company created from an email domain",
 			companyId: company.id,
 			domain,
+			organizationId,
 		});
 
 		return company.id;

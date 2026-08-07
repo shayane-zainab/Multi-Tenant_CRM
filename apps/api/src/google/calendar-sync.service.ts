@@ -72,9 +72,9 @@ export class CalendarSyncService {
 		await this.state.markRunning(row.id);
 
 		const [internal, suppressedDomains, suppressedEmails] = await Promise.all([
-			this.match.internalIdentity(),
-			this.match.suppressedDomains(),
-			this.match.suppressedEmails(),
+			this.match.internalIdentity(row.organizationId),
+			this.match.suppressedDomains(row.organizationId),
+			this.match.suppressedEmails(row.organizationId),
 		]);
 
 		const context = {
@@ -199,7 +199,8 @@ export class CalendarSyncService {
 		if (!originalStart) return "ignored";
 
 		const key = {
-			iCalUid_originalStartTime: {
+			organizationId_iCalUid_originalStartTime: {
+				organizationId: row.organizationId,
 				iCalUid,
 				originalStartTime: originalStart.at,
 			},
@@ -208,6 +209,7 @@ export class CalendarSyncService {
 		if (event.status === "cancelled") {
 			const deleted = await this.db.calendarEvent.deleteMany({
 				where: {
+					organizationId: row.organizationId,
 					iCalUid,
 					originalStartTime: originalStart.at,
 				},
@@ -226,6 +228,7 @@ export class CalendarSyncService {
 
 		const match = await this.match.resolve(
 			{
+				organizationId: row.organizationId,
 				participants,
 				allowCreate: row.autoCreate && !declinedByUs,
 				source: RecordSource.CALENDAR,
@@ -243,6 +246,7 @@ export class CalendarSyncService {
 		const record = await this.db.calendarEvent.upsert({
 			where: key,
 			create: {
+				organizationId: row.organizationId,
 				iCalUid,
 				originalStartTime: originalStart.at,
 				recurringEventId: event.recurringEventId ?? null,
@@ -277,8 +281,8 @@ export class CalendarSyncService {
 		});
 
 		await this.syncAttendees(record.id, event);
-		await this.prepareForMeeting(record.id, start.at);
-		await this.project(record.id, row.userId, {
+		await this.prepareForMeeting(row.organizationId, record.id, start.at);
+		await this.project(row.organizationId, record.id, row.userId, {
 			title: event.summary ?? "Meeting",
 			startsAt: start.at,
 			companyId: match.companyId,
@@ -307,7 +311,7 @@ export class CalendarSyncService {
 		);
 
 		const contacts = await this.db.contact.findMany({
-			where: { email: { in: emails } },
+			where: { organizationId: row.organizationId, email: { in: emails } },
 			select: { id: true, email: true },
 		});
 
@@ -339,6 +343,7 @@ export class CalendarSyncService {
 	}
 
 	private async prepareForMeeting(
+		organizationId: string,
 		eventId: string,
 		startsAt: Date,
 	): Promise<void> {
@@ -356,12 +361,13 @@ export class CalendarSyncService {
 
 		for (const attendee of attendees) {
 			if (attendee.contactId) {
-				await this.agent.meetingSoon(attendee.contactId, startsAt);
+				await this.agent.meetingSoon(organizationId, attendee.contactId, startsAt);
 			}
 		}
 	}
 
 	private async project(
+		organizationId: string,
 		calendarEventId: string,
 		userId: string,
 		summary: {
@@ -377,6 +383,7 @@ export class CalendarSyncService {
 		const activity = await this.db.activity.upsert({
 			where: { calendarEventId },
 			create: {
+				organizationId,
 				type: ActivityType.MEETING,
 				subject: summary.title,
 				body,
