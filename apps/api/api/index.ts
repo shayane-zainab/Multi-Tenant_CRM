@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createApp } from "../src/create-app";
+// @ts-ignore - this file is generated after compilation
+import { createApp } from "../src/main.ts";
 
 type ExpressInstance = (req: IncomingMessage, res: ServerResponse) => void;
 

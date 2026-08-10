@@ -54,14 +54,14 @@ export function SheetHeader({ compact }: { compact?: boolean }) {
 			)}
 		>
 			<div className="flex items-start gap-3">
-				<CompanyMark company={{ name: "Comp AI" }} size={32} glyph={18} />
+				<CompanyMark company={{ name: "Aristral" }} size={32} glyph={18} />
 
 				<div className="min-w-0 grow pt-0.5">
 					<p className="mb-0.5 font-medium text-lg/[125%] tracking-[-0.45px]">
-						Comp AI
+						Aristral
 					</p>
 					<p className="text-muted-foreground text-xs/[162.5%]">
-						trycomp.ai · Compliance
+						aristral.com · AI Automation
 					</p>
 				</div>
 

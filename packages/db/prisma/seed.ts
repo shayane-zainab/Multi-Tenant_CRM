@@ -7,7 +7,7 @@ import {
 	DealStage,
 	RateSource,
 } from "../src/generated/prisma/enums";
-import { readReportingCurrency, SETTINGS_ID } from "../src/settings";
+import { readReportingCurrency } from "../src/settings";
 
 function makeRandom(seed: number): () => number {
 	let a = seed;
@@ -335,44 +335,77 @@ function slug(value: string): string {
 		.replace(/^-|-$/g, "");
 }
 
-async function seedOwners(): Promise<string[]> {
+async function seedOrganization(): Promise<string> {
+	const id = "org_seed123";
+	await db.organization.upsert({
+		where: { slug: "seed-org" },
+		create: {
+			id,
+			name: "Acme Corp (Seed)",
+			slug: "seed-org",
+			createdAt: new Date(),
+		},
+		update: {},
+	});
+	return id;
+}
+
+async function seedOwners(orgId: string): Promise<string[]> {
+	let userIds: string[];
 	const existing = await db.user.findMany({ select: { id: true } });
 
 	if (existing.length > 0) {
 		console.log(`Using ${existing.length} existing user(s) as owners.`);
-		return existing.map((user) => user.id);
+		userIds = existing.map((user) => user.id);
+	} else {
+		console.log("No users yet — creating placeholder sales reps.");
+		const created = await Promise.all(
+			OWNERS.map((owner) =>
+				db.user.upsert({
+					where: { email: owner.email },
+					create: {
+						id: `seed-${slug(owner.name)}`,
+						name: owner.name,
+						email: owner.email,
+						emailVerified: true,
+						updatedAt: new Date(),
+					},
+					update: {},
+					select: { id: true },
+				}),
+			),
+		);
+		userIds = created.map((user) => user.id);
 	}
 
-	console.log("No users yet — creating placeholder sales reps.");
-	const created = await Promise.all(
-		OWNERS.map((owner) =>
-			db.user.upsert({
-				where: { email: owner.email },
-				create: {
-					id: `seed-${slug(owner.name)}`,
-					name: owner.name,
-					email: owner.email,
-					emailVerified: true,
-					updatedAt: new Date(),
-				},
-				update: {},
-				select: { id: true },
-			}),
-		),
-	);
+	for (const userId of userIds) {
+		await db.member.upsert({
+			where: { organizationId_userId: { organizationId: orgId, userId } },
+			create: {
+				id: `mem-${userId}`,
+				organizationId: orgId,
+				userId,
+				role: "admin",
+				createdAt: new Date(),
+			},
+			update: {},
+		});
+	}
 
-	return created.map((user) => user.id);
+	return userIds;
 }
 
 async function seedCompanies(
+	orgId: string,
 	ownerIds: string[],
 ): Promise<{ id: string; name: string; domain: string }[]> {
 	const companies = [];
 
 	for (const company of COMPANIES) {
 		const row = await db.company.upsert({
-			where: { domain: company.domain },
+			where: { organizationId_domain: { organizationId: orgId, domain: company.domain } },
 			create: {
+				organizationId: orgId,
 				name: company.name,
 				domain: company.domain,
 				website: `https://${company.domain}`,
@@ -423,6 +456,7 @@ async function seedIcons(
 type SeededContact = { id: string; companyId: string };
 
 async function seedContacts(
+	orgId: string,
 	companies: { id: string; domain: string }[],
 	ownerIds: string[],
 ): Promise<SeededContact[]> {
@@ -438,8 +472,9 @@ async function seedContacts(
 			used.add(email);
 
 			const contact = await db.contact.upsert({
-				where: { email },
+				where: { organizationId_email: { organizationId: orgId, email } },
 				create: {
+					organizationId: orgId,
 					firstName,
 					lastName,
 					email,
@@ -488,20 +523,19 @@ const DEAL_CURRENCIES = ["USD", "USD", "USD", "EUR", "GBP", "JPY", "CAD"];
 
 let seedBase = "USD";
 
-async function seedRates(): Promise<number> {
+async function seedRates(orgId: string): Promise<number> {
 	const asOf = daysFromNow(-1);
 
-	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
+	await db.orgSetting.upsert({
+		where: { organizationId: orgId },
 		create: {
-			id: SETTINGS_ID,
+			organizationId: orgId,
 			reportingCurrency: DEFAULT_REPORTING_CURRENCY,
 		},
 		update: {},
-		select: { id: true },
 	});
 
-	seedBase = await readReportingCurrency(db);
+	seedBase = await readReportingCurrency(db, orgId);
 
 	if (seedBase !== "USD") {
 		console.log(
@@ -556,6 +590,7 @@ function money(usdAmount: number, currency: string) {
 }
 
 async function seedDeals(
+	orgId: string,
 	companies: { id: string; name: string }[],
 	contacts: SeededContact[],
 	ownerIds: string[],
@@ -583,10 +618,11 @@ async function seedDeals(
 			await db.deal.upsert({
 				where: { id },
 				create: {
+					organizationId: orgId,
 					id,
 					name:
 						n === 0
-							? `${company.name} — Comp AI`
+							? `${company.name} — Aristral`
 							: `${company.name} — expansion`,
 					description: pick(DEAL_DESCRIPTIONS),
 					companyId: company.id,
@@ -644,6 +680,7 @@ async function seedDeals(
 }
 
 async function seedActivities(
+	orgId: string,
 	companies: { id: string }[],
 	contacts: SeededContact[],
 	deals: SeededDeal[],
@@ -667,12 +704,14 @@ async function seedActivities(
 		dealId: string | null;
 		createdById: string;
 		createdAt: Date;
+		organizationId: string;
 		meta?: { from: DealStage; to: DealStage };
 	};
 
 	const rows: ActivityRow[] = [];
 
 	const base = (companyId: string, createdById: string, createdAt: Date) => ({
+		organizationId: orgId,
 		companyId,
 		contactId: null,
 		dealId: null,
@@ -763,12 +802,13 @@ async function seedActivities(
 }
 
 async function main() {
-	const rates = await seedRates();
-	const ownerIds = await seedOwners();
-	const companies = await seedCompanies(ownerIds);
-	const contacts = await seedContacts(companies, ownerIds);
-	const deals = await seedDeals(companies, contacts, ownerIds);
-	const activities = await seedActivities(companies, contacts, deals, ownerIds);
+	const orgId = await seedOrganization();
+	const rates = await seedRates(orgId);
+	const ownerIds = await seedOwners(orgId);
+	const companies = await seedCompanies(orgId, ownerIds);
+	const contacts = await seedContacts(orgId, companies, ownerIds);
+	const deals = await seedDeals(orgId, companies, contacts, ownerIds);
+	const activities = await seedActivities(orgId, companies, contacts, deals, ownerIds);
 
 	console.log(
 		`Seeded ${companies.length} companies, ${contacts.length} contacts, ` +

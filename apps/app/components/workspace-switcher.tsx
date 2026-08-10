@@ -1,6 +1,6 @@
 "use client";
 
-import Check from "@carbon/icons-react/es/Check";
+import Checkmark from "@carbon/icons-react/es/Checkmark";
 import ChevronDown from "@carbon/icons-react/es/ChevronDown";
 import Workspace from "@carbon/icons-react/es/Workspace";
 import { authClient } from "@crm/auth/client";
@@ -75,7 +75,7 @@ export function WorkspaceSwitcher({
 						className="flex items-center justify-between"
 					>
 						<span className="truncate">{org.name}</span>
-						{org.id === currentWorkspaceId && <Check className="size-4" />}
+						{org.id === currentWorkspaceId && <Checkmark className="size-4" />}
 					</DropdownMenuItem>
 				))}
 			</DropdownMenuContent>

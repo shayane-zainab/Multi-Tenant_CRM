@@ -1,6 +1,8 @@
 import { Logger } from "@nestjs/common";
 import { createApp } from "./create-app";
 
+export { createApp };
+
 async function bootstrap() {
 	const app = await createApp();
 	app.enableShutdownHooks();
@@ -15,10 +17,13 @@ async function bootstrap() {
 	});
 }
 
-void bootstrap().catch((error: unknown) => {
-	new Logger("Bootstrap").fatal(
-		{ message: "API failed to start" },
-		error instanceof Error ? error.stack : String(error),
-	);
-	process.exit(1);
-});
+// Only bootstrap if we are not running as a Vercel serverless function
+if (!process.env.VERCEL) {
+	void bootstrap().catch((error: unknown) => {
+		new Logger("Bootstrap").fatal(
+			{ message: "API failed to start" },
+			error instanceof Error ? error.stack : String(error),
+		);
+		process.exit(1);
+	});
+}

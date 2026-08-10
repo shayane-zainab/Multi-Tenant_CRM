@@ -2,7 +2,7 @@
 	"name": "@crm/db",
 	"version": "0.0.0",
 	"private": true,
-	"type": "module",
+	
 	"exports": {
 		".": "./src/index.ts",
 		"./agent-tasks": "./src/agent-tasks.ts",
@@ -28,7 +28,7 @@
 		"db:seed": "bun scripts/require-local-db.ts db:seed && prisma db seed",
 		"db:studio": "prisma studio",
 		"test": "bun test",
-		"dev": "prisma generate --watch",
+		"dev": "prisma generate",
 		"lint": "biome check .",
 		"postinstall": "prisma generate",
 		"clean": "rm -rf .turbo node_modules src/generated"

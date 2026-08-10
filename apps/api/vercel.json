@@ -1,9 +1,12 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"rewrites": [
+		{ "source": "/(.*)", "destination": "/api" }
+	],
 	"crons": [
 		{
 			"path": "/internal/sync/google",
-			"schedule": "*/5 * * * *"
+			"schedule": "0 0 * * *"
 		},
 		{
 			"path": "/internal/sync/rates",

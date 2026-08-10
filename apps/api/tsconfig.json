@@ -2,7 +2,9 @@
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"extends": "@crm/typescript-config/nestjs.json",
 	"compilerOptions": {
-		"types": ["bun"],
+		"types": ["bun", "node"],
+		"moduleResolution": "bundler",
+		"skipLibCheck": true,
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true
 	},

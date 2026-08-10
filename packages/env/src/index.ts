@@ -72,7 +72,7 @@ export function parseEnv(source: string): Record<string, string> {
 }
 
 export function loadRootEnv(): void {
-	if (loaded) return;
+	if (loaded || process.env.NODE_ENV === "production") return;
 	loaded = true;
 
 	const root = findWorkspaceRoot(process.cwd());
