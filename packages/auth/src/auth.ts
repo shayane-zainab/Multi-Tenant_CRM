@@ -130,12 +130,11 @@ export const auth = betterAuth({
 			create: {
 				before: async (session) => {
 					if (!session.activeOrganizationId) {
-						const membership = await db.member.findFirst({
-							where: { userId: session.userId },
-							select: { organizationId: true },
-						});
-						if (membership) {
-							session.activeOrganizationId = membership.organizationId;
+						const organizationId = await ensureOrganizationMembership(
+							session.userId,
+						);
+						if (organizationId) {
+							session.activeOrganizationId = organizationId;
 						}
 					}
 					return { data: session };
