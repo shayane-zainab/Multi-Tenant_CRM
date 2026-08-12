@@ -1,3 +1,4 @@
+import { apiKey } from "@better-auth/api-key";
 import { sso } from "@better-auth/sso";
 import { db } from "@crm/db";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -6,6 +7,7 @@ import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
+import { MCP_KEY_PREFIX } from "./mcp";
 import { ensureOrganizationMembership } from "./organization";
 import { SYNC_SCOPES } from "./scopes";
 import { notifySignedIn } from "./signed-in";
@@ -98,6 +100,18 @@ export const auth = betterAuth({
 
 		sso({
 			organizationProvisioning: { disabled: true },
+		}),
+
+		apiKey({
+			references: "organization",
+			enableMetadata: true,
+			requireName: true,
+			defaultPrefix: MCP_KEY_PREFIX,
+			rateLimit: {
+				enabled: true,
+				timeWindow: 60_000,
+				maxRequests: 240,
+			},
 		}),
 	],
 

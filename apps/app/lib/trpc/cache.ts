@@ -23,6 +23,7 @@ export type CrmCache = {
 	currency(options?: Options): Promise<void>;
 	workspace(options?: Options): Promise<void>;
 	sso(options?: Options): Promise<void>;
+	mcpKeys(options?: Options): Promise<void>;
 	everything(): Promise<void>;
 };
 
@@ -212,6 +213,8 @@ export function useCrmCache(): CrmCache {
 				[trpc.sso.settings.queryKey(), trpc.sso.signInOptions.queryKey()],
 				options,
 			),
+
+		mcpKeys: (options) => run([trpc.mcpKeys.settings.queryKey()], [], options),
 
 		everything: () => queryClient.invalidateQueries(),
 	};

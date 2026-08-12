@@ -2,6 +2,11 @@ export { type Auth, auth, type Session, type SessionUser } from "./auth";
 export { AUTH_COOKIE_PREFIX } from "./cookies";
 export { isGoogleConfigured } from "./env";
 export {
+	canManageMcpKeys,
+	MCP_KEY_PREFIX,
+	mcpEndpointUrl,
+} from "./mcp";
+export {
 	canChangeRole,
 	canManageCurrency,
 	canManageWhatsApp,

@@ -6,5 +6,6 @@ import { SearchService } from "./search.service";
 @Module({
 	imports: [TrpcModule],
 	providers: [SearchService, SearchRouter],
+	exports: [SearchService],
 })
 export class SearchModule {}
