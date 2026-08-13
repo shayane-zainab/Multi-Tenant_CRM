@@ -63,6 +63,10 @@ export class ActivitiesRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof completeInput>,
 	) {
-		return this.activities.complete(ctx.organizationId, input.id, input.completed);
+		return this.activities.complete(
+			ctx.organizationId,
+			input.id,
+			input.completed,
+		);
 	}
 }

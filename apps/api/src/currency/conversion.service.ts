@@ -39,7 +39,10 @@ export class ConversionService {
 		return readReportingCurrency(this.db, organizationId);
 	}
 
-	async rateFor(organizationId: string, currency: string): Promise<ResolvedRate | null> {
+	async rateFor(
+		organizationId: string,
+		currency: string,
+	): Promise<ResolvedRate | null> {
 		const base = await this.reportingCurrency(organizationId);
 		return resolveRate(this.db, base, currency);
 	}
@@ -125,7 +128,10 @@ export class ConversionService {
 		return this.rerate(organizationId, true);
 	}
 
-	private async rerate(organizationId: string, onlyMissing: boolean): Promise<RerateResult> {
+	private async rerate(
+		organizationId: string,
+		onlyMissing: boolean,
+	): Promise<RerateResult> {
 		const base = await this.reportingCurrency(organizationId);
 
 		const groups = await this.db.deal.groupBy({

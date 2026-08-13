@@ -48,7 +48,10 @@ export class SettingsService {
 	async agentModel(organizationId: string): Promise<AgentModelSettings> {
 		const [model, row] = await Promise.all([
 			readAgentModel(this.db, organizationId),
-			this.db.orgSetting.findFirst({ where: { organizationId }, select: { updatedAt: true } }),
+			this.db.orgSetting.findFirst({
+				where: { organizationId },
+				select: { updatedAt: true },
+			}),
 		]);
 
 		return {
@@ -60,10 +63,16 @@ export class SettingsService {
 		};
 	}
 
-	async setAgentModel(organizationId: string, modelId: string | null): Promise<AgentModelSettings> {
+	async setAgentModel(
+		organizationId: string,
+		modelId: string | null,
+	): Promise<AgentModelSettings> {
 		if (modelId === null) {
 			await writeAgentModel(this.db, organizationId, null);
-			this.logger.log({ message: "Agent model reset to the default", organizationId });
+			this.logger.log({
+				message: "Agent model reset to the default",
+				organizationId,
+			});
 			return this.agentModel(organizationId);
 		}
 
@@ -88,7 +97,11 @@ export class SettingsService {
 			contextWindowTokens: chosen.contextWindowTokens,
 		});
 
-		this.logger.log({ message: "Agent model changed", modelId: chosen.id, organizationId });
+		this.logger.log({
+			message: "Agent model changed",
+			modelId: chosen.id,
+			organizationId,
+		});
 
 		return this.agentModel(organizationId);
 	}
@@ -104,7 +117,10 @@ export class SettingsService {
 		return { configured: key !== null, hint: key ? maskKey(key) : null };
 	}
 
-	async setResearchKey(organizationId: string, apiKey: string): Promise<ResearchKeySettings> {
+	async setResearchKey(
+		organizationId: string,
+		apiKey: string,
+	): Promise<ResearchKeySettings> {
 		const check = await this.researchKeys.verify(apiKey);
 
 		if (check.outcome === "invalid") {

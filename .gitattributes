@@ -1,0 +1,14 @@
+# Biome formats to LF and fails on CRLF. Without this, a Windows clone with
+# core.autocrlf=true checks every file out with CRLF and `bun run lint` fails
+# on files nobody touched, while CI on Linux passes.
+* text=auto eol=lf
+
+# Binary, so never touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -67,8 +67,12 @@ export async function searchCrm(
 	}
 
 	const [contacts, companies, deals] = await Promise.all([
-		wants("contact") ? searchContacts(organizationId, term, words, email, limit) : [],
-		wants("company") ? searchCompanies(organizationId, term, words, domain, limit) : [],
+		wants("contact")
+			? searchContacts(organizationId, term, words, email, limit)
+			: [],
+		wants("company")
+			? searchCompanies(organizationId, term, words, domain, limit)
+			: [],
 		wants("deal") ? searchDeals(organizationId, term, words, limit) : [],
 	]);
 

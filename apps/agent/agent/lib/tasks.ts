@@ -97,14 +97,26 @@ export async function completeTask(
 
 	return db.agentTask.findUnique({
 		where: { id: taskId },
-		select: { id: true, contactId: true, companyId: true, organizationId: true, kind: true },
+		select: {
+			id: true,
+			contactId: true,
+			companyId: true,
+			organizationId: true,
+			kind: true,
+		},
 	});
 }
 
 export async function taskSubject(taskId: string): Promise<TaskSubject | null> {
 	return db.agentTask.findUnique({
 		where: { id: taskId },
-		select: { id: true, contactId: true, companyId: true, organizationId: true, kind: true },
+		select: {
+			id: true,
+			contactId: true,
+			companyId: true,
+			organizationId: true,
+			kind: true,
+		},
 	});
 }
 

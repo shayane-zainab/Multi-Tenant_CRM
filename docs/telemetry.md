@@ -149,7 +149,7 @@ sent.
 | Property | What it is |
 | --- | --- |
 | `contacts_bucket`, `companies_bucket`, `deals_bucket`, `activities_bucket` | Sizes, in bands |
-| `contacts_by_source`, `companies_by_source` | Counts by `MANUAL` / `IMPORT` / `EMAIL` / `CALENDAR` |
+| `contacts_by_source`, `companies_by_source` | Counts by `MANUAL` / `IMPORT` / `EMAIL` / `CALENDAR` / `WHATSAPP` |
 | `deals_by_stage` | Counts by `DealStage`. Stages, never amounts |
 | `activities_by_type` | Counts by `ActivityType` |
 | `mailbox_sync_configured` | Whether any `MailboxSync` row exists |

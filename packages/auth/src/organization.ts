@@ -28,6 +28,9 @@ export function canManageCurrency(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export function canManageWhatsApp(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
 
 async function findMembership(userId: string): Promise<string | undefined> {
 	const membership = await db.member.findFirst({

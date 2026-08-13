@@ -120,6 +120,11 @@ wrong in the direction that looks useful.
 - **Bands are behaviour.** `PROBABLE` means *a rep decides* — a correct outcome.
 - **A new fact field goes in `FIELDS` (`lib/facts.ts`) *and* `FACT_COLUMNS`**
   (`apps/api/src/contacts/contacts.service.ts`).
+- **`crm.whatsapp-reply` is primary, and priced like a thread reply.** A phone is
+  held by one person, so a message from the number we hold is identity. It is *not*
+  evidence of an employer — a WhatsApp profile name is whatever they typed. It arrives
+  through `read_crm_history` like everything else; there is no separate WhatsApp tool,
+  because the agent should not have to know which channel a sentence came from.
 
 ## Optional by default
 
