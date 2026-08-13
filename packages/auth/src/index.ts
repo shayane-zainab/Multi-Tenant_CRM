@@ -4,6 +4,7 @@ export { isGoogleConfigured } from "./env";
 export {
 	canChangeRole,
 	canManageCurrency,
+	canManageWhatsApp,
 	canRenameWorkspace,
 	DEFAULT_WORKSPACE_NAME,
 	isWorkspaceAdmin,

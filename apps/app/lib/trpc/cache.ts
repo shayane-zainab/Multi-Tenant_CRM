@@ -18,6 +18,7 @@ export type CrmCache = {
 	removed(record: RemovedRecord): Promise<void>;
 	activity(options?: Options): Promise<void>;
 	google(options?: Options): Promise<void>;
+	whatsapp(threadId?: string, options?: Options): Promise<void>;
 	settings(options?: Options): Promise<void>;
 	currency(options?: Options): Promise<void>;
 	workspace(options?: Options): Promise<void>;
@@ -157,6 +158,21 @@ export function useCrmCache(): CrmCache {
 					trpc.companies.byId.queryKey(),
 					trpc.contacts.byId.queryKey(),
 					trpc.dashboard.summary.queryKey(),
+				],
+				options,
+			),
+
+		whatsapp: (threadId, options) =>
+			run(
+				[
+					trpc.whatsapp.status.queryKey(),
+					...(threadId ? [trpc.whatsapp.thread.pathKey()] : []),
+				],
+				[
+					trpc.whatsapp.threads.pathKey(),
+					...activityKeys(),
+					trpc.contacts.byId.queryKey(),
+					trpc.companies.byId.queryKey(),
 				],
 				options,
 			),

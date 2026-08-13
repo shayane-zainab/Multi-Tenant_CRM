@@ -110,10 +110,54 @@ self-hoster's admin cannot redeploy.
 - **Filter, sort and paginate in Prisma.** List procedures take `listInput` and return
   `{ rows, total, facetCounts }`. Never filter a whole table in the browser; never
   interpolate `sort` into a field name — use `resolveOrderBy`.
+- **A schema's exported name is global.** The generator resolves `input:` schemas by
+  *symbol name* across the whole project, not per module — so two `*.contracts.ts`
+  files both exporting `setAutoCreateInput` silently give one procedure the other's
+  type, and the error surfaces in an unrelated component. Prefix anything that is not
+  obviously unique (`setWhatsAppAutoCreateInput`, `whatsAppThreadInput`).
 - **`src/generated/server.ts` is generated *and committed*, and `build` must never
   regenerate it** — the generator needs GLIBC 2.39, newer than Vercel's build image.
   Only `check-types` and `dev` run it. If the app cannot see a new procedure, it has
   not run.
+
+## WhatsApp is a webhook, and the number is the tenancy key
+
+`apps/api/src/whatsapp`. Meta posts to `POST /internal/whatsapp/webhook`; there is no
+polling and no cron. Requires **Coexistence**, so the rep keeps using the WhatsApp
+Business app and Meta mirrors both sides here.
+
+- **`phoneNumberId` resolves the workspace, not a session.** The webhook is anonymous,
+  so `WhatsAppConnection.phoneNumberId` (unique) is the only path to `organizationId` —
+  the same rule as `MailboxSync` for the Google cron. **An event for a number no
+  workspace has connected is logged and dropped**, never guessed at.
+- **Every body is verified before it is read.** `X-Hub-Signature-256` HMAC against
+  `WHATSAPP_APP_SECRET`, compared with `timingSafeEqual`. Unset **fails closed** (503),
+  because the alternative is a public endpoint that writes to the CRM.
+- **The route needs the raw bytes**, so `WhatsAppModule` applies `express.raw` to that
+  one path. The app runs `bodyParser: false`; re-serialising a parsed body changes it
+  and the HMAC stops matching.
+- **Ingest is idempotent and a failure re-throws** — `@@unique([threadId, waMessageId])`
+  plus `skipDuplicates`, so Meta's retry is free and swallowing an error would lose the
+  message instead.
+- **`message_echoes` is what the rep sent from their phone.** It is threaded by `to`,
+  not `from`, or every echo lands in a thread keyed by our own number.
+- **Matching is by phone and nothing else.** `phoneVariants` covers how the row may
+  have been typed; anything past an exact match is the agent's job, so a created
+  contact gets an `identify` task rather than a guessed name. Auto-create is off by
+  default, **never fires on an echo** — a number the rep messaged first is not inbound
+  interest — and **respects `SuppressedPhone`**, or deleting a contact would last until
+  their next message.
+- **Sending needs a token that may not exist.** Per-connection `accessToken` first,
+  `WHATSAPP_ACCESS_TOKEN` second, and neither is a 503 that names both — inbound keeps
+  working regardless.
+- **Groups and status updates never arrive.** Meta does not send them under
+  Coexistence. Do not build anything that assumes a group thread can exist.
+- **The token is written and never read back**, like an SSO client secret.
+  `whatsapp.status` returns `canSend`, a boolean, and no call returns `accessToken`.
+- **A conversation is an `Activity` with a `whatsAppThread`**, so it lands in the
+  existing timeline beside email and meetings rather than in a tab of its own.
+  `purgeSyncedData` deletes the threads and recomputes `lastActivityAt` on every
+  record they touched; disconnecting cascades the same way.
 
 ## Not every address on a thread is a person
 
@@ -142,6 +186,11 @@ self-hoster's admin cannot redeploy.
   next thread. `ContactsService.delete` writes `SuppressedContact`, and
   `externalParticipants` drops it like a `SuppressedDomain` — one filter covering
   contact creation, company auto-creation and attribution.
+- **And by phone, for the same reason.** A WhatsApp contact has no address to suppress,
+  so `SuppressedPhone` is the equivalent — written by the same delete, checked by
+  `WhatsAppMatchService` before auto-creating, and lifted by `allowPhoneAgain` on
+  `contacts.create` and `.update` beside the email one. Keyed on `normalizePhone`
+  output, so `+92 333 6104114` and `923336104114` are the same suppression.
 - **Keyed lower case.** `normalizeEmail` (`crm/values.ts`) is the one canonicaliser,
   on `contacts.create`, `.update` and the suppression; conflict checks and `allowAgain`
   match case-insensitively.

@@ -1,8 +1,5 @@
 ﻿import { db } from "@crm/db";
 
-
-
-
 export const DEFAULT_WORKSPACE_NAME = "CRM";
 
 export const WORKSPACE_ROLES = ["owner", "admin", "member"] as const;
@@ -29,6 +26,9 @@ export function canManageCurrency(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export function canManageWhatsApp(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
 
 export async function ensureOrganizationMembership(
 	userId: string,
