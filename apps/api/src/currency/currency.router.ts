@@ -34,7 +34,11 @@ export class CurrencyRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof setReportingCurrencyInput>,
 	) {
-		return this.currency.setReportingCurrency(ctx.organizationId, ctx.user.id, input.currency);
+		return this.currency.setReportingCurrency(
+			ctx.organizationId,
+			ctx.user.id,
+			input.currency,
+		);
 	}
 
 	@Mutation({ input: setManualRateInput })
@@ -42,7 +46,12 @@ export class CurrencyRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof setManualRateInput>,
 	) {
-		return this.currency.setManualRate(ctx.organizationId, ctx.user.id, input.currency, input.rate);
+		return this.currency.setManualRate(
+			ctx.organizationId,
+			ctx.user.id,
+			input.currency,
+			input.rate,
+		);
 	}
 
 	@Mutation({ input: removeManualRateInput })
@@ -50,7 +59,11 @@ export class CurrencyRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof removeManualRateInput>,
 	) {
-		return this.currency.removeManualRate(ctx.organizationId, ctx.user.id, input.currency);
+		return this.currency.removeManualRate(
+			ctx.organizationId,
+			ctx.user.id,
+			input.currency,
+		);
 	}
 
 	@Mutation()

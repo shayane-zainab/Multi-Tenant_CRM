@@ -81,6 +81,10 @@ export class CompaniesRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof setPrimaryContactInput>,
 	) {
-		return this.companies.setPrimaryContact(ctx.organizationId, input.companyId, input.contactId);
+		return this.companies.setPrimaryContact(
+			ctx.organizationId,
+			input.companyId,
+			input.contactId,
+		);
 	}
 }

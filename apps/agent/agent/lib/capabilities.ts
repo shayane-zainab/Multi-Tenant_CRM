@@ -13,7 +13,9 @@ export type Capability = {
 	readonly from: string;
 };
 
-export async function contextDevKey(organizationId?: string): Promise<string | null> {
+export async function contextDevKey(
+	organizationId?: string,
+): Promise<string | null> {
 	if (!organizationId) return null;
 	try {
 		return await readContextDevKey(db, organizationId);
@@ -28,7 +30,9 @@ export async function contextDevKey(organizationId?: string): Promise<string | n
 	}
 }
 
-export async function capabilities(organizationId?: string): Promise<readonly Capability[]> {
+export async function capabilities(
+	organizationId?: string,
+): Promise<readonly Capability[]> {
 	return capabilitiesFrom(await contextDevKey(organizationId));
 }
 
@@ -70,7 +74,10 @@ export function capabilitiesFrom(
 	];
 }
 
-export async function enabled(id: string, organizationId?: string): Promise<boolean> {
+export async function enabled(
+	id: string,
+	organizationId?: string,
+): Promise<boolean> {
 	return (await capabilities(organizationId)).some(
 		(capability) => capability.id === id && capability.enabled,
 	);
@@ -98,7 +105,9 @@ export async function logCapabilities(): Promise<void> {
 	}
 }
 
-export async function capabilitiesMarkdown(organizationId?: string): Promise<string> {
+export async function capabilitiesMarkdown(
+	organizationId?: string,
+): Promise<string> {
 	return markdownFor(await capabilities(organizationId));
 }
 

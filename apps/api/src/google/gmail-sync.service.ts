@@ -210,9 +210,9 @@ export class GmailSyncService {
 		if (ids.length === 0) return { written: 0, remaining: 0 };
 
 		const alreadyHave = await this.db.emailMessage.findMany({
-			where: { 
+			where: {
 				gmailMessageId: { in: [...ids] },
-				thread: { organizationId: row.organizationId }
+				thread: { organizationId: row.organizationId },
 			},
 			select: { gmailMessageId: true },
 		});
@@ -262,7 +262,10 @@ export class GmailSyncService {
 		if (!parsed) return false;
 
 		const existing = await this.db.emailMessage.findFirst({
-			where: { rfcMessageId: parsed.rfcMessageId, thread: { organizationId: row.organizationId } },
+			where: {
+				rfcMessageId: parsed.rfcMessageId,
+				thread: { organizationId: row.organizationId },
+			},
 			select: { id: true },
 		});
 		if (existing) return false;

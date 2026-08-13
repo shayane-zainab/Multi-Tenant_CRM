@@ -34,7 +34,11 @@ export class AgentTriggerService {
 		});
 	}
 
-	async companyRequested(organizationId: string, companyId: string, reason: string): Promise<void> {
+	async companyRequested(
+		organizationId: string,
+		companyId: string,
+		reason: string,
+	): Promise<void> {
 		await this.enqueue(organizationId, {
 			companyId,
 			kind: "brand",
@@ -52,7 +56,11 @@ export class AgentTriggerService {
 		});
 	}
 
-	async workspaceChanged(organizationId: string, website: string, reason: string): Promise<void> {
+	async workspaceChanged(
+		organizationId: string,
+		website: string,
+		reason: string,
+	): Promise<void> {
 		await this.enqueue(organizationId, {
 			kind: "workspace-profile",
 			reason: `${reason} (${website})`,
@@ -61,7 +69,11 @@ export class AgentTriggerService {
 		});
 	}
 
-	async contactCreated(organizationId: string, contactId: string, reason: string): Promise<void> {
+	async contactCreated(
+		organizationId: string,
+		contactId: string,
+		reason: string,
+	): Promise<void> {
 		await this.enqueue(organizationId, {
 			contactId,
 			kind: "identify",
@@ -71,7 +83,11 @@ export class AgentTriggerService {
 		});
 	}
 
-	async meetingSoon(organizationId: string, contactId: string, when: Date): Promise<void> {
+	async meetingSoon(
+		organizationId: string,
+		contactId: string,
+		when: Date,
+	): Promise<void> {
 		await this.enqueue(organizationId, {
 			contactId,
 			kind: "meeting-prep",
@@ -81,14 +97,17 @@ export class AgentTriggerService {
 		});
 	}
 
-	async backfill(organizationId: string, input: {
-		kind: string;
-		reason: string;
-		contactIds?: string[];
-		companyIds?: string[];
-		budget?: number;
-		priority?: number;
-	}): Promise<{ queued: number; alreadyQueued: number }> {
+	async backfill(
+		organizationId: string,
+		input: {
+			kind: string;
+			reason: string;
+			contactIds?: string[];
+			companyIds?: string[];
+			budget?: number;
+			priority?: number;
+		},
+	): Promise<{ queued: number; alreadyQueued: number }> {
 		const subject = input.contactIds ? "contactId" : "companyId";
 		const ids = [...new Set(input.contactIds ?? input.companyIds ?? [])];
 		if (ids.length === 0) return { queued: 0, alreadyQueued: 0 };
@@ -146,14 +165,17 @@ export class AgentTriggerService {
 		}
 	}
 
-	private async enqueue(organizationId: string, task: {
-		contactId?: string;
-		companyId?: string;
-		kind: string;
-		reason: string;
-		priority: number;
-		budget: number;
-	}): Promise<void> {
+	private async enqueue(
+		organizationId: string,
+		task: {
+			contactId?: string;
+			companyId?: string;
+			kind: string;
+			reason: string;
+			priority: number;
+			budget: number;
+		},
+	): Promise<void> {
 		try {
 			const pending = await this.db.agentTask.findFirst({
 				where: {

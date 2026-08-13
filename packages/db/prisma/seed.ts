@@ -403,7 +403,12 @@ async function seedCompanies(
 
 	for (const company of COMPANIES) {
 		const row = await db.company.upsert({
-			where: { organizationId_domain: { organizationId: orgId, domain: company.domain } },
+			where: {
+				organizationId_domain: {
+					organizationId: orgId,
+					domain: company.domain,
+				},
+			},
 			create: {
 				organizationId: orgId,
 				name: company.name,
@@ -808,7 +813,13 @@ async function main() {
 	const companies = await seedCompanies(orgId, ownerIds);
 	const contacts = await seedContacts(orgId, companies, ownerIds);
 	const deals = await seedDeals(orgId, companies, contacts, ownerIds);
-	const activities = await seedActivities(orgId, companies, contacts, deals, ownerIds);
+	const activities = await seedActivities(
+		orgId,
+		companies,
+		contacts,
+		deals,
+		ownerIds,
+	);
 
 	console.log(
 		`Seeded ${companies.length} companies, ${contacts.length} contacts, ` +

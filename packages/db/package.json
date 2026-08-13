@@ -2,7 +2,7 @@
 	"name": "@crm/db",
 	"version": "0.0.0",
 	"private": true,
-	
+
 	"exports": {
 		".": "./src/index.ts",
 		"./agent-tasks": "./src/agent-tasks.ts",

@@ -6,7 +6,9 @@ import {
 
 export type { WorkspaceIdentity };
 
-export async function identity(organizationId?: string): Promise<WorkspaceIdentity | null> {
+export async function identity(
+	organizationId?: string,
+): Promise<WorkspaceIdentity | null> {
 	if (!organizationId) return null;
 	try {
 		return await readWorkspaceIdentity(db, organizationId);
