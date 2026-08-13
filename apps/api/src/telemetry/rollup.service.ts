@@ -135,7 +135,11 @@ export class RollupService {
 	private async shape(): Promise<Properties> {
 		const [model, members, ssoProviders, postgres, contextKey] =
 			await Promise.all([
-				this.db.orgSetting.findFirst({ select: { agentModelId: true, agentModelContextWindow: true } }).catch(() => null),
+				this.db.orgSetting
+					.findFirst({
+						select: { agentModelId: true, agentModelContextWindow: true },
+					})
+					.catch(() => null),
 				this.db.member.count(),
 				this.db.ssoProvider.count(),
 				this.postgresMajor(),

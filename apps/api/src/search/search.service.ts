@@ -19,7 +19,10 @@ const PER_KIND = 5;
 export class SearchService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async quick(organizationId: string, q: string): Promise<{ hits: SearchHit[] }> {
+	async quick(
+		organizationId: string,
+		q: string,
+	): Promise<{ hits: SearchHit[] }> {
 		const term = q.trim();
 		if (term.length < 2) return { hits: [] };
 

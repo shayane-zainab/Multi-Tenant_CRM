@@ -64,7 +64,11 @@ beforeAll(async () => {
 	previousReportingCurrency = existing?.reportingCurrency ?? null;
 
 	await writeReportingCurrency(db, orgId, "USD");
-	await db.organization.upsert({ where: { id: orgId }, create: { id: orgId, name: "Org 1", slug: "org-1", createdAt: new Date() }, update: {} });
+	await db.organization.upsert({
+		where: { id: orgId },
+		create: { id: orgId, name: "Org 1", slug: "org-1", createdAt: new Date() },
+		update: {},
+	});
 	await clearRates();
 
 	await db.user.upsert({
@@ -98,7 +102,9 @@ afterAll(async () => {
 	if (previousReportingCurrency) {
 		await writeReportingCurrency(db, orgId, previousReportingCurrency);
 	} else {
-		await db.orgSetting.updateMany({ data: { organizationId: orgId, reportingCurrency: null } });
+		await db.orgSetting.updateMany({
+			data: { organizationId: orgId, reportingCurrency: null },
+		});
 	}
 
 	await conversion.rerateAll(orgId);
@@ -283,7 +289,8 @@ describe("a converted figure knows which currency it is in", () => {
 		const before = await pipelineCents();
 
 		const orphan = await db.deal.create({
-			data: { organizationId: orgId,
+			data: {
+				organizationId: orgId,
 				name: `Orphan ${suffix}`,
 				companyId,
 				ownerId: userId,
@@ -317,7 +324,8 @@ describe("a converted figure knows which currency it is in", () => {
 		const rows = await Promise.all(
 			[" usd ", "Usd"].map((currency, index) =>
 				db.deal.create({
-					data: { organizationId: orgId,
+					data: {
+						organizationId: orgId,
 						name: `Variant ${index} ${suffix}`,
 						companyId,
 						ownerId: userId,
@@ -388,7 +396,8 @@ describe("a converted figure knows which currency it is in", () => {
 		await clearRates();
 
 		const stranded = await db.deal.create({
-			data: { organizationId: orgId,
+			data: {
+				organizationId: orgId,
 				name: `Stranded ${suffix}`,
 				companyId,
 				ownerId: userId,
@@ -444,7 +453,8 @@ describe("the dashboard only values what it can convert", () => {
 		const closed = stage === DealStage.CLOSED_WON;
 
 		return db.deal.create({
-			data: { organizationId: orgId,
+			data: {
+				organizationId: orgId,
 				name: `${name} ${suffix}`,
 				companyId,
 				ownerId: analystId,

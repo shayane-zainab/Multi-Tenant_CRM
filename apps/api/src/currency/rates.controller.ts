@@ -1,5 +1,4 @@
 import type { Db } from "@crm/db";
-import { InjectDatabase } from "../database/database.constants";
 import {
 	Controller,
 	ForbiddenException,
@@ -12,6 +11,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import type { EnvironmentVariables } from "../config/env.validation";
+import { InjectDatabase } from "../database/database.constants";
 import { ConversionService } from "./conversion.service";
 import { RatesService } from "./rates.service";
 
@@ -63,7 +63,11 @@ export class RatesController {
 				continue;
 			}
 			const filled = await this.conversion.fillMissing(org.id);
-			results.push({ ...refresh, converted: filled.converted, missing: filled.missing });
+			results.push({
+				...refresh,
+				converted: filled.converted,
+				missing: filled.missing,
+			});
 		}
 
 		return { results };
