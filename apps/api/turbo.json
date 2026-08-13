@@ -4,7 +4,8 @@
 	"tasks": {
 		"build": {
 			"dependsOn": ["$TURBO_EXTENDS$"],
-			"outputs": ["dist/**"]
+			"cache": false,
+			"outputs": []
 		},
 		"check-types": {
 			"dependsOn": ["$TURBO_EXTENDS$", "trpc:generate"]

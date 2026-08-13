@@ -18,6 +18,7 @@ identifying *this person*, not merely being consistent with them.
 | `profile.email-match` | The profile itself shows the address we hold. Decisive. |
 | `linkedin.employer-and-name` | A LinkedIn profile where the employer matches *and* the name is consistent with the address. Both, or it is not this. |
 | `crm.thread-reply` | They replied, from that address, on a thread we synced. Proof of identity. |
+| `crm.whatsapp-reply` | They messaged us on WhatsApp from the number we hold. A phone is held by one person, so this is identity, not merely contact. It says nothing about their employer on its own. |
 | `crm.signature-block` | Their own signature states it. The best source there is for a job title. |
 | `github.account-identity` | The GitHub account's own `name` (or name plus company) matches. |
 | `crm.meeting-attendance` | They accepted a calendar invite we have. |

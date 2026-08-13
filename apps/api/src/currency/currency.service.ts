@@ -59,8 +59,12 @@ export class CurrencyService {
 		private readonly rates: RatesService,
 	) {}
 
-	async settings(organizationId: string, actingUserId: string): Promise<CurrencySettings> {
-		const reportingCurrency = await this.conversion.reportingCurrency(organizationId);
+	async settings(
+		organizationId: string,
+		actingUserId: string,
+	): Promise<CurrencySettings> {
+		const reportingCurrency =
+			await this.conversion.reportingCurrency(organizationId);
 
 		const [rows, refreshedAt, unconverted, usage] = await Promise.all([
 			this.db.exchangeRate.findMany({
@@ -132,11 +136,16 @@ export class CurrencyService {
 				),
 			unconverted,
 			catalog: [...CURRENCIES],
-			canManage: canManageCurrency(await this.roleOf(organizationId, actingUserId)),
+			canManage: canManageCurrency(
+				await this.roleOf(organizationId, actingUserId),
+			),
 		};
 	}
 
-	private async roleOf(organizationId: string, userId: string): Promise<WorkspaceRole | null> {
+	private async roleOf(
+		organizationId: string,
+		userId: string,
+	): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
 				organizationId_userId: { organizationId, userId },
@@ -149,7 +158,10 @@ export class CurrencyService {
 		return isWorkspaceRole(member.role) ? member.role : "member";
 	}
 
-	private async requireManager(organizationId: string, userId: string): Promise<void> {
+	private async requireManager(
+		organizationId: string,
+		userId: string,
+	): Promise<void> {
 		if (!canManageCurrency(await this.roleOf(organizationId, userId))) {
 			throw new ForbiddenException(
 				"Only an owner or an admin can change how money is reported.",
@@ -167,7 +179,8 @@ export class CurrencyService {
 		const currency = normalizeCurrency(code);
 		const current = await this.conversion.reportingCurrency(organizationId);
 
-		if (currency === current) return this.settings(organizationId, actingUserId);
+		if (currency === current)
+			return this.settings(organizationId, actingUserId);
 
 		await writeReportingCurrency(this.db, organizationId, currency);
 
@@ -196,7 +209,8 @@ export class CurrencyService {
 		await this.requireManager(organizationId, actingUserId);
 
 		const quoteCurrency = normalizeCurrency(code);
-		const baseCurrency = await this.conversion.reportingCurrency(organizationId);
+		const baseCurrency =
+			await this.conversion.reportingCurrency(organizationId);
 
 		if (quoteCurrency === baseCurrency) {
 			throw new BadRequestException(
@@ -244,7 +258,8 @@ export class CurrencyService {
 		await this.requireManager(organizationId, actingUserId);
 
 		const quoteCurrency = normalizeCurrency(code);
-		const baseCurrency = await this.conversion.reportingCurrency(organizationId);
+		const baseCurrency =
+			await this.conversion.reportingCurrency(organizationId);
 
 		await this.db.exchangeRate.deleteMany({
 			where: { baseCurrency, quoteCurrency, source: RateSource.MANUAL },
@@ -259,7 +274,10 @@ export class CurrencyService {
 		return this.settings(organizationId, actingUserId);
 	}
 
-	async refresh(organizationId: string, actingUserId: string): Promise<CurrencySettings> {
+	async refresh(
+		organizationId: string,
+		actingUserId: string,
+	): Promise<CurrencySettings> {
 		await this.requireManager(organizationId, actingUserId);
 
 		const refresh = await this.rates.refresh(organizationId);

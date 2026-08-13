@@ -63,7 +63,7 @@ export function EmailThreadEntry({
 								<ThreadMessage
 									key={message.id}
 									from={message.fromName ?? message.fromEmail}
-									fromEmail={message.fromEmail}
+									fromHandle={message.fromEmail}
 									fromImageUrl={message.fromImageUrl}
 									sentAt={timeFormat.format(new Date(message.sentAt))}
 									direction={message.direction}

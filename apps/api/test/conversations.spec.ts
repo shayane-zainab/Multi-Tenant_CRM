@@ -29,13 +29,27 @@ beforeAll(async () => {
 	await db.user.deleteMany({ where: { id: userId } });
 	await db.contact.deleteMany({ where: { email } });
 
-	await db.organization.upsert({ where: { id: orgId }, create: { id: orgId, name: "Org 1", slug: `org-${suffix}`, createdAt: new Date() }, update: {} });
+	await db.organization.upsert({
+		where: { id: orgId },
+		create: {
+			id: orgId,
+			name: "Org 1",
+			slug: `org-${suffix}`,
+			createdAt: new Date(),
+		},
+		update: {},
+	});
 
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
 	});
 	const contact = await db.contact.create({
-		data: { organizationId: orgId, firstName: "Conversation", lastName: "Subject", email },
+		data: {
+			organizationId: orgId,
+			firstName: "Conversation",
+			lastName: "Subject",
+			email,
+		},
 		select: { id: true },
 	});
 	contactId = contact.id;
@@ -125,7 +139,9 @@ describe("ConversationsService", () => {
 	});
 
 	it("keeps one rep's conversations out of another's", async () => {
-		expect(await service.list(orgId, { contactId }, "somebody-else")).toEqual([]);
+		expect(await service.list(orgId, { contactId }, "somebody-else")).toEqual(
+			[],
+		);
 	});
 
 	it("refuses a conversation that belongs to a record of neither kind", async () => {
@@ -163,6 +179,8 @@ describe("ConversationsService", () => {
 		const [conversation] = await service.list(orgId, { contactId }, userId);
 		if (!conversation) throw new Error("expected a conversation");
 
-		expect(service.remove(orgId, conversation.id, "somebody-else")).rejects.toThrow();
+		expect(
+			service.remove(orgId, conversation.id, "somebody-else"),
+		).rejects.toThrow();
 	});
 });

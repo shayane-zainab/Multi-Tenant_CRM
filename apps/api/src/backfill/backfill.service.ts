@@ -68,8 +68,10 @@ export class BackfillService implements OnModuleInit {
 
 		void (async () => {
 			try {
-				const orgs = await this.db.organization.findMany({ select: { id: true } });
-				
+				const orgs = await this.db.organization.findMany({
+					select: { id: true },
+				});
+
 				let totalQueued = 0;
 				let totalRemaining = 0;
 				let totalIconsResolving = 0;
@@ -128,13 +130,19 @@ export class BackfillService implements OnModuleInit {
 		);
 	}
 
-	async run(organizationId: string, scope: BackfillScope): Promise<BackfillResult> {
+	async run(
+		organizationId: string,
+		scope: BackfillScope,
+	): Promise<BackfillResult> {
 		if (scope === "contacts") return this.runContacts(organizationId);
 
 		return this.runCompanies(organizationId, scope === "deals");
 	}
 
-	private async runCompanies(organizationId: string, dealsOnly: boolean): Promise<BackfillResult> {
+	private async runCompanies(
+		organizationId: string,
+		dealsOnly: boolean,
+	): Promise<BackfillResult> {
 		const onDeals: Prisma.CompanyWhereInput = dealsOnly
 			? { deals: { some: {} } }
 			: {};
@@ -186,7 +194,9 @@ export class BackfillService implements OnModuleInit {
 			alreadyQueued: brand.alreadyQueued + profile.alreadyQueued,
 		};
 
-		const iconsResolving = dealsOnly ? 0 : await this.sweepFavicons(organizationId);
+		const iconsResolving = dealsOnly
+			? 0
+			: await this.sweepFavicons(organizationId);
 
 		return {
 			...queued,
@@ -219,7 +229,9 @@ export class BackfillService implements OnModuleInit {
 		const headroom = MAX_PER_RUN - photoRows.length;
 
 		const [researchTotal, researchRows] = await Promise.all([
-			this.db.contact.count({ where: this.contactsNeverResearched(organizationId) }),
+			this.db.contact.count({
+				where: this.contactsNeverResearched(organizationId),
+			}),
 			headroom > 0
 				? this.db.contact.findMany({
 						where: this.contactsNeverResearched(organizationId),
@@ -272,11 +284,19 @@ export class BackfillService implements OnModuleInit {
 		return rows.length;
 	}
 
-	private companiesNeedingBrand(organizationId: string): Prisma.CompanyWhereInput {
-		return { organizationId, domain: { not: null }, enrichmentStatus: NEVER_SUCCEEDED };
+	private companiesNeedingBrand(
+		organizationId: string,
+	): Prisma.CompanyWhereInput {
+		return {
+			organizationId,
+			domain: { not: null },
+			enrichmentStatus: NEVER_SUCCEEDED,
+		};
 	}
 
-	private async companiesNeedingArtwork(organizationId: string): Promise<Prisma.CompanyWhereInput> {
+	private async companiesNeedingArtwork(
+		organizationId: string,
+	): Promise<Prisma.CompanyWhereInput> {
 		const since = new Date(Date.now() - RECHECK_BRAND_AFTER_MS);
 
 		const checked = await this.db.agentTask.findMany({
@@ -297,7 +317,9 @@ export class BackfillService implements OnModuleInit {
 		};
 	}
 
-	private async contactsNeedingPhoto(organizationId: string): Promise<Prisma.ContactWhereInput> {
+	private async contactsNeedingPhoto(
+		organizationId: string,
+	): Promise<Prisma.ContactWhereInput> {
 		const since = new Date(Date.now() - RECHECK_PHOTO_AFTER_MS);
 
 		const checked = await this.db.agentTask.findMany({
@@ -321,7 +343,9 @@ export class BackfillService implements OnModuleInit {
 		};
 	}
 
-	private contactsNeverResearched(organizationId: string): Prisma.ContactWhereInput {
+	private contactsNeverResearched(
+		organizationId: string,
+	): Prisma.ContactWhereInput {
 		return { organizationId, enrichmentStatus: NEVER_SUCCEEDED };
 	}
 }

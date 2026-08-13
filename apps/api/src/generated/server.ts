@@ -23,6 +23,7 @@ import { dealListInput, dealIdInput, dealCreateInput, dealUpdateArgs, setStageIn
 import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInput } from "../google/google.contracts";
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
+import { connectInput, connectionInput, setWhatsAppAutoCreateInput, threadsInput, whatsAppThreadInput, sendInput } from "../whatsapp/whatsapp.contracts";
 import { memberListInput, updateWorkspaceInput, setMemberRoleInput } from "../workspace/workspace.contracts";
 import type { ActivitiesRouter } from "../activities/activities.router";
 import type { CompaniesRouter } from "../companies/companies.router";
@@ -36,6 +37,7 @@ import type { SearchRouter } from "../search/search.router";
 import type { SettingsRouter } from "../settings/settings.router";
 import type { SsoRouter } from "../sso/sso.router";
 import type { UsersRouter } from "../users/users.router";
+import type { WhatsAppRouter } from "../whatsapp/whatsapp.router";
 import type { WorkspaceRouter } from "../workspace/workspace.router";
 
 const appRouter = t.router({
@@ -223,6 +225,30 @@ const appRouter = t.router({
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<UsersRouter["me"]>>),
     list: publicProcedure
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<UsersRouter["list"]>>)
+    }),
+  whatsapp: t.router({
+    status: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["status"]>>),
+    connect: publicProcedure
+      .input(connectInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["connect"]>>),
+    purgeSyncedData: publicProcedure
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["purgeSyncedData"]>>),
+    disconnect: publicProcedure
+      .input(connectionInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["disconnect"]>>),
+    setAutoCreate: publicProcedure
+      .input(setWhatsAppAutoCreateInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["setAutoCreate"]>>),
+    threads: publicProcedure
+      .input(threadsInput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["threads"]>>),
+    thread: publicProcedure
+      .input(whatsAppThreadInput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["thread"]>>),
+    send: publicProcedure
+      .input(sendInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WhatsAppRouter["send"]>>)
     }),
   workspace: t.router({
     get: publicProcedure

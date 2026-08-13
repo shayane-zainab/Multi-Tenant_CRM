@@ -52,7 +52,12 @@ export class SsoRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof registerSsoProviderInput>,
 	) {
-		return this.sso.register(ctx.organizationId, ctx.user.id, headersOf(ctx), input);
+		return this.sso.register(
+			ctx.organizationId,
+			ctx.user.id,
+			headersOf(ctx),
+			input,
+		);
 	}
 
 	@Mutation({ input: deleteSsoProviderInput })
@@ -61,6 +66,11 @@ export class SsoRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof deleteSsoProviderInput>,
 	) {
-		return this.sso.remove(ctx.organizationId, ctx.user.id, headersOf(ctx), input);
+		return this.sso.remove(
+			ctx.organizationId,
+			ctx.user.id,
+			headersOf(ctx),
+			input,
+		);
 	}
 }

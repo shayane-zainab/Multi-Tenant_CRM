@@ -4,9 +4,9 @@ import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
-import { ensureOrganizationMembership } from "./organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
+import { ensureOrganizationMembership } from "./organization";
 import { SYNC_SCOPES } from "./scopes";
 import { notifySignedIn } from "./signed-in";
 import {
@@ -130,12 +130,11 @@ export const auth = betterAuth({
 			create: {
 				before: async (session) => {
 					if (!session.activeOrganizationId) {
-						const membership = await db.member.findFirst({
-							where: { userId: session.userId },
-							select: { organizationId: true },
-						});
-						if (membership) {
-							session.activeOrganizationId = membership.organizationId;
+						const organizationId = await ensureOrganizationMembership(
+							session.userId,
+						);
+						if (organizationId) {
+							session.activeOrganizationId = organizationId;
 						}
 					}
 					return { data: session };
@@ -156,4 +155,3 @@ export const auth = betterAuth({
 export type Auth = typeof auth;
 export type Session = typeof auth.$Infer.Session;
 export type SessionUser = Session["user"];
-

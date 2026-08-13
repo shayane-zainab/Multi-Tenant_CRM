@@ -106,6 +106,18 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	CRM_TELEMETRY_DISABLED?: string;
+
+	@IsOptional()
+	@IsString()
+	WHATSAPP_VERIFY_TOKEN?: string;
+
+	@IsOptional()
+	@IsString()
+	WHATSAPP_APP_SECRET?: string;
+
+	@IsOptional()
+	@IsString()
+	WHATSAPP_ACCESS_TOKEN?: string;
 }
 
 export function validateEnv(

@@ -177,7 +177,11 @@ export class GoogleConnectionService {
 
 		await this.db.suppressedDomain.upsert({
 			where: { domain: normalised },
-			create: { organizationId, domain: normalised, reason: options.reason ?? null },
+			create: {
+				organizationId,
+				domain: normalised,
+				reason: options.reason ?? null,
+			},
 			update: { reason: options.reason ?? null },
 		});
 
@@ -193,8 +197,12 @@ export class GoogleConnectionService {
 		const companyIds = companies.map((c) => c.id);
 
 		const [threads, events] = await this.db.$transaction([
-			this.db.emailThread.deleteMany({ where: { companyId: { in: companyIds } } }),
-			this.db.calendarEvent.deleteMany({ where: { companyId: { in: companyIds } } }),
+			this.db.emailThread.deleteMany({
+				where: { companyId: { in: companyIds } },
+			}),
+			this.db.calendarEvent.deleteMany({
+				where: { companyId: { in: companyIds } },
+			}),
 		]);
 
 		await this.stamp.recomputeAll();

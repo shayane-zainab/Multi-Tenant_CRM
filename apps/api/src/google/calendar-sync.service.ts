@@ -362,7 +362,11 @@ export class CalendarSyncService {
 
 		for (const attendee of attendees) {
 			if (attendee.contactId) {
-				await this.agent.meetingSoon(organizationId, attendee.contactId, startsAt);
+				await this.agent.meetingSoon(
+					organizationId,
+					attendee.contactId,
+					startsAt,
+				);
 			}
 		}
 	}

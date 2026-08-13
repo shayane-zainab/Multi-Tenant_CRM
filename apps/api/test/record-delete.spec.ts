@@ -62,7 +62,8 @@ const ours = {
 
 async function parked(subject: { contactId?: string; companyId?: string }) {
 	return db.agentTask.create({
-		data: { organizationId: orgId,
+		data: {
+			organizationId: orgId,
 			...subject,
 			kind: "identify",
 			reason: `record-delete-spec (${suffix})`,
@@ -102,7 +103,11 @@ async function clean() {
 
 beforeAll(async () => {
 	await clean();
-	await db.organization.upsert({ where: { id: orgId }, create: { id: orgId, name: "Org 1", slug: "org-1", createdAt: new Date() }, update: {} });
+	await db.organization.upsert({
+		where: { id: orgId },
+		create: { id: orgId, name: "Org 1", slug: "org-1", createdAt: new Date() },
+		update: {},
+	});
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
 	});
@@ -125,11 +130,12 @@ describe("deleting a contact", () => {
 		await parked({ contactId });
 
 		await db.agentEvent.create({
-			data: { id: `evt-${suffix}`,
+			data: {
+				id: `evt-${suffix}`,
 				sessionId: `ses-${suffix}`,
 				contactId,
 				type: "session.started",
-				data: { organizationId: orgId,},
+				data: { organizationId: orgId },
 				emittedAt: new Date(),
 			},
 		});
@@ -154,7 +160,8 @@ describe("deleting a contact", () => {
 
 		const result = await match.resolve(
 			{
-				organizationId: orgId, participants: [{ email, name: "Gone Person" }],
+				organizationId: orgId,
+				participants: [{ email, name: "Gone Person" }],
 				allowCreate: true,
 				source: RecordSource.EMAIL,
 				ownerId: userId,
@@ -170,7 +177,8 @@ describe("deleting a contact", () => {
 	it("still files the colleagues who were not deleted", async () => {
 		const result = await match.resolve(
 			{
-				organizationId: orgId, participants: [
+				organizationId: orgId,
+				participants: [
 					{ email, name: "Gone Person" },
 					{ email: colleague, name: "Stays Here" },
 				],
@@ -202,7 +210,10 @@ describe("deleting a contact", () => {
 		const typed = `Mixed.Case@${domain.toUpperCase()}`;
 		const asSynced = typed.toLowerCase();
 
-		const created = await contacts.create(orgId, { firstName: "Mixed", email: typed });
+		const created = await contacts.create(orgId, {
+			firstName: "Mixed",
+			email: typed,
+		});
 
 		expect(
 			await db.contact.findUnique({
@@ -219,7 +230,8 @@ describe("deleting a contact", () => {
 
 		const result = await match.resolve(
 			{
-				organizationId: orgId, participants: [{ email: asSynced, name: "Mixed Case" }],
+				organizationId: orgId,
+				participants: [{ email: asSynced, name: "Mixed Case" }],
 				allowCreate: true,
 				source: RecordSource.EMAIL,
 				ownerId: userId,
@@ -247,7 +259,12 @@ describe("deleting a company", () => {
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { organizationId: orgId, name: "Doomed deal", companyId: company.id, ownerId: userId },
+			data: {
+				organizationId: orgId,
+				name: "Doomed deal",
+				companyId: company.id,
+				ownerId: userId,
+			},
 			select: { id: true },
 		});
 
@@ -285,13 +302,19 @@ describe("the activity stamps a delete leaves behind", () => {
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { organizationId: orgId, name: "Stamped deal", companyId: company.id, ownerId: userId },
+			data: {
+				organizationId: orgId,
+				name: "Stamped deal",
+				companyId: company.id,
+				ownerId: userId,
+			},
 			select: { id: true },
 		});
 
 		const at = new Date();
 		await db.activity.create({
-			data: { organizationId: orgId,
+			data: {
+				organizationId: orgId,
 				type: "NOTE",
 				subject: "The only thing on this account",
 				companyId: company.id,
@@ -301,7 +324,7 @@ describe("the activity stamps a delete leaves behind", () => {
 				createdAt: at,
 			},
 		});
-		await stamp.touch( 
+		await stamp.touch(
 			{ companyId: company.id, contactId: contact.id, dealId: deal.id },
 			at,
 		);
@@ -333,13 +356,19 @@ describe("the activity stamps a delete leaves behind", () => {
 			companyId: company.id,
 		});
 		const deal = await db.deal.create({
-			data: { organizationId: orgId, name: "Orphaned deal", companyId: company.id, ownerId: userId },
+			data: {
+				organizationId: orgId,
+				name: "Orphaned deal",
+				companyId: company.id,
+				ownerId: userId,
+			},
 			select: { id: true },
 		});
 
 		const at = new Date();
 		await db.activity.create({
-			data: { organizationId: orgId,
+			data: {
+				organizationId: orgId,
 				type: "MEETING",
 				subject: "Only ever attached to the deal",
 				contactId: contact.id,

@@ -129,7 +129,10 @@ export class GoogleMatchService {
 		];
 
 		const known = await this.db.company.findMany({
-			where: { organizationId: request.organizationId, domain: { in: domains } },
+			where: {
+				organizationId: request.organizationId,
+				domain: { in: domains },
+			},
 			select: { id: true, domain: true },
 		});
 
@@ -171,9 +174,13 @@ export class GoogleMatchService {
 
 		if (!lead) return { companyId: null, contactId: null, external };
 
-		const companyId = await this.companies.companyForEmail(request.organizationId, lead.email, {
-			ownerId: request.ownerId,
-		});
+		const companyId = await this.companies.companyForEmail(
+			request.organizationId,
+			lead.email,
+			{
+				ownerId: request.ownerId,
+			},
+		);
 		if (!companyId) {
 			return { companyId: null, contactId: null, external };
 		}

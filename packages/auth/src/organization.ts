@@ -1,7 +1,6 @@
-﻿import { db } from "@crm/db";
-
-
-
+﻿import { randomUUID } from "node:crypto";
+import { db } from "@crm/db";
+import { workspaceSlug } from "@crm/db/workspace";
 
 export const DEFAULT_WORKSPACE_NAME = "CRM";
 
@@ -29,10 +28,11 @@ export function canManageCurrency(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export function canManageWhatsApp(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
 
-export async function ensureOrganizationMembership(
-	userId: string,
-): Promise<string | undefined> {
+async function findMembership(userId: string): Promise<string | undefined> {
 	const membership = await db.member.findFirst({
 		where: { userId },
 		select: { organizationId: true },
@@ -40,4 +40,47 @@ export async function ensureOrganizationMembership(
 	});
 
 	return membership?.organizationId;
+}
+
+export async function ensureOrganizationMembership(
+	userId: string,
+): Promise<string | undefined> {
+	const existing = await findMembership(userId);
+	if (existing) return existing;
+
+	const base = workspaceSlug(DEFAULT_WORKSPACE_NAME);
+
+	for (let attempt = 0; attempt < 5; attempt += 1) {
+		const now = new Date();
+		const slug = attempt === 0 ? base : `${base}-${randomUUID().slice(0, 8)}`;
+
+		try {
+			const organization = await db.organization.create({
+				data: {
+					id: randomUUID(),
+					name: DEFAULT_WORKSPACE_NAME,
+					slug,
+					createdAt: now,
+				},
+				select: { id: true },
+			});
+
+			await db.member.create({
+				data: {
+					id: randomUUID(),
+					organizationId: organization.id,
+					userId,
+					role: "owner",
+					createdAt: now,
+				},
+			});
+
+			return organization.id;
+		} catch {
+			const raced = await findMembership(userId);
+			if (raced) return raced;
+		}
+	}
+
+	return undefined;
 }

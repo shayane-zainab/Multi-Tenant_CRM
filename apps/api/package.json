@@ -8,9 +8,9 @@
 		"./app-router": "./src/generated/server.ts"
 	},
 	"scripts": {
-		"build": "node -e \"const fs=require('fs'); if (!fs.existsSync('public')) fs.mkdirSync('public'); fs.writeFileSync('public/index.html', 'OK');\"",
+		"build": "node scripts/build-func.mjs",
 		"check-types": "tsc --noEmit",
-		"dev": "concurrently -n api,trpc -c blue,magenta \"bunx tsx watch src/main.ts\" \"nestjs-trpc watch -e src/app.module.ts -r \\\"**/*.router.ts\\\" -o src/generated\"",
+		"dev": "concurrently -n api,trpc -c blue,magenta \"bun --watch src/main.ts\" \"nestjs-trpc watch -e src/app.module.ts -r \\\"**/*.router.ts\\\" -o src/generated\"",
 		"dev:session": "bun scripts/dev-session.ts",
 		"lint": "biome check .",
 		"postinstall": "node scripts/chmod-trpc-binary.mjs",

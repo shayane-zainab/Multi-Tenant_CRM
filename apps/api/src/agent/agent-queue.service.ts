@@ -6,11 +6,17 @@ import { InjectDatabase } from "../database/database.constants";
 export class AgentQueueService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async queuedCompanies(organizationId: string, ids: readonly string[]): Promise<Set<string>> {
+	async queuedCompanies(
+		organizationId: string,
+		ids: readonly string[],
+	): Promise<Set<string>> {
 		return this.queued(organizationId, "companyId", ids);
 	}
 
-	async queuedContacts(organizationId: string, ids: readonly string[]): Promise<Set<string>> {
+	async queuedContacts(
+		organizationId: string,
+		ids: readonly string[],
+	): Promise<Set<string>> {
 		return this.queued(organizationId, "contactId", ids);
 	}
 

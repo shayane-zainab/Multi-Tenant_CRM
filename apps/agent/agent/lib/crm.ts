@@ -146,12 +146,24 @@ export type CrmHistory = {
 		attended: boolean;
 		attendees: { email: string; name: string | null }[];
 	}[];
+	whatsapp: {
+		phone: string;
+		profileName: string | null;
+		messageCount: number;
+		lastMessageAt: string;
+		messages: {
+			direction: string;
+			sentAt: string;
+			body: string | null;
+		}[];
+	}[];
 	stats: {
 		emails: number;
 		theyReplied: boolean;
 		lastReplyAt: string | null;
 		meetings: number;
 		nextMeetingAt: string | null;
+		whatsappMessages: number;
 	};
 	colleagues: { id: string; name: string; title: string | null }[];
 };
@@ -193,7 +205,7 @@ export async function readCrmHistory(
 
 	if (!contact) return null;
 
-	const [threads, meetings, colleagues] = await Promise.all([
+	const [threads, meetings, whatsapp, colleagues] = await Promise.all([
 		db.emailThread.findMany({
 			where: { contactId },
 			orderBy: { lastMessageAt: "desc" },
@@ -235,6 +247,28 @@ export async function readCrmHistory(
 				},
 			},
 		}),
+		db.whatsAppThread.findMany({
+			where: { contactId },
+			orderBy: { lastMessageAt: "desc" },
+			take: options.threads ?? 5,
+			select: {
+				waId: true,
+				profileName: true,
+				messageCount: true,
+				lastMessageAt: true,
+				messages: {
+					orderBy: { sentAt: "desc" },
+					take: options.messagesPerThread ?? 6,
+					select: {
+						direction: true,
+						sentAt: true,
+						body: true,
+						caption: true,
+						kind: true,
+					},
+				},
+			},
+		}),
 		contact.companyId
 			? db.contact.findMany({
 					where: { companyId: contact.companyId, id: { not: contactId } },
@@ -245,8 +279,10 @@ export async function readCrmHistory(
 			: Promise.resolve([]),
 	]);
 
-	const inbound = threads
-		.flatMap((thread) => thread.messages)
+	const inbound = [
+		...threads.flatMap((thread) => thread.messages),
+		...whatsapp.flatMap((thread) => thread.messages),
+	]
 		.filter((message) => message.direction === "INBOUND")
 		.sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime());
 
@@ -297,12 +333,27 @@ export async function readCrmHistory(
 				name: attendee.name,
 			})),
 		})),
+		whatsapp: whatsapp.map((thread) => ({
+			phone: thread.waId.startsWith("+") ? thread.waId : `+${thread.waId}`,
+			profileName: thread.profileName,
+			messageCount: thread.messageCount,
+			lastMessageAt: thread.lastMessageAt.toISOString(),
+			messages: thread.messages.map((message) => ({
+				direction: message.direction,
+				sentAt: message.sentAt.toISOString(),
+				body: message.body ?? message.caption ?? `[${message.kind}]`,
+			})),
+		})),
 		stats: {
 			emails: threads.reduce((total, thread) => total + thread.messageCount, 0),
 			theyReplied: inbound.length > 0,
 			lastReplyAt: inbound[0]?.sentAt.toISOString() ?? null,
 			meetings: meetings.length,
 			nextMeetingAt: upcoming[0]?.startsAt.toISOString() ?? null,
+			whatsappMessages: whatsapp.reduce(
+				(total, thread) => total + thread.messageCount,
+				0,
+			),
 		},
 		colleagues: colleagues.map((colleague) => ({
 			id: colleague.id,

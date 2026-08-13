@@ -3,13 +3,35 @@ import "@crm/env/load";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { type Prisma, PrismaClient } from "./generated/prisma/client";
 
-const connectionString = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL;
 
-if (!connectionString) {
+if (!databaseUrl) {
 	throw new Error(
 		"DATABASE_URL is not set. Copy .env.example to .env at the root of the repo and fill it in, or set DATABASE_URL in the environment.",
 	);
 }
+
+const PRISMA_ONLY_PARAMS = ["schema", "pgbouncer", "connection_limit"];
+
+function splitConnectionString(url: string): {
+	connectionString: string;
+	schema?: string;
+} {
+	let parsed: URL;
+
+	try {
+		parsed = new URL(url);
+	} catch {
+		return { connectionString: url };
+	}
+
+	const schema = parsed.searchParams.get("schema") ?? undefined;
+	for (const param of PRISMA_ONLY_PARAMS) parsed.searchParams.delete(param);
+
+	return { connectionString: parsed.toString(), schema };
+}
+
+const { connectionString, schema } = splitConnectionString(databaseUrl);
 
 export interface PrismaLogRecord {
 	level: Prisma.LogLevel;
@@ -54,7 +76,12 @@ const logDefinitions: Prisma.LogDefinition[] = [
 
 const createPrismaClient = () => {
 	const client = new PrismaClient({
-		adapter: new PrismaPg({ connectionString }),
+		adapter: new PrismaPg(
+			schema
+				? { connectionString, options: `-c search_path="${schema}",public` }
+				: { connectionString },
+			schema ? { schema } : undefined,
+		),
 		log: logDefinitions,
 	});
 

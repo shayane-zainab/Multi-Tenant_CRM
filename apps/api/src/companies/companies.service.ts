@@ -140,7 +140,10 @@ export class CompaniesService {
 			this.facetCounts(organizationId, input),
 		]);
 
-		const queued = await this.queue.queuedCompanies(organizationId, rows.map((row) => row.id));
+		const queued = await this.queue.queuedCompanies(
+			organizationId,
+			rows.map((row) => row.id),
+		);
 
 		return {
 			rows: rows.map((row) => ({
@@ -244,7 +247,14 @@ export class CompaniesService {
 			throw new NotFoundException(`No company with id ${id}.`);
 		}
 
-		const { deals, primaryContact, enrichedAt, createdAt, organizationId: _, ...rest } = company;
+		const {
+			deals,
+			primaryContact,
+			enrichedAt,
+			createdAt,
+			organizationId: _,
+			...rest
+		} = company;
 
 		return {
 			...rest,
@@ -253,7 +263,8 @@ export class CompaniesService {
 			enrichedAt: enrichedAt?.toISOString() ?? null,
 			primaryContactId: primaryContact?.id ?? null,
 			primaryContact,
-			reportingCurrency: await this.conversion.reportingCurrency(organizationId),
+			reportingCurrency:
+				await this.conversion.reportingCurrency(organizationId),
 			deals: deals.map((deal) => ({
 				...deal,
 				amount: undefined,
@@ -267,7 +278,13 @@ export class CompaniesService {
 
 	async options(organizationId: string, q: string) {
 		return this.db.company.findMany({
-			where: this.buildWhere(organizationId, { q, owner: FACET_ALL, industry: FACET_ALL, enrichment: FACET_ALL, source: FACET_ALL } as any),
+			where: this.buildWhere(organizationId, {
+				q,
+				owner: FACET_ALL,
+				industry: FACET_ALL,
+				enrichment: FACET_ALL,
+				source: FACET_ALL,
+			} as any),
 			select: { id: true, name: true, domain: true, iconUrl: true },
 			orderBy: { name: "asc" },
 			take: 100,
@@ -314,11 +331,7 @@ export class CompaniesService {
 		return company;
 	}
 
-	async update(
-		organizationId: string,
-		id: string,
-		input: CompanyUpdateInput,
-	) {
+	async update(organizationId: string, id: string, input: CompanyUpdateInput) {
 		const data: Prisma.CompanyUpdateInput = {};
 
 		if (input.name !== undefined) data.name = input.name.trim();
@@ -436,7 +449,10 @@ export class CompaniesService {
 		return { id, name: deleted.name };
 	}
 
-	async enrich(organizationId: string, id: string): Promise<{ id: string; queued: boolean }> {
+	async enrich(
+		organizationId: string,
+		id: string,
+	): Promise<{ id: string; queued: boolean }> {
 		const company = await this.db.company.findUnique({
 			where: { id },
 			select: { id: true, organizationId: true },
@@ -450,7 +466,11 @@ export class CompaniesService {
 			where: { id },
 			data: { enrichmentStatus: "PENDING", enrichmentError: null },
 		});
-		await this.agent.companyRequested(organizationId, id, "A rep asked for a fresh look");
+		await this.agent.companyRequested(
+			organizationId,
+			id,
+			"A rep asked for a fresh look",
+		);
 
 		return { id, queued: true };
 	}
@@ -561,10 +581,7 @@ export class CompaniesService {
 		return where;
 	}
 
-	private async facetCounts(
-		organizationId: string,
-		input: CompanyListInput,
-	) {
+	private async facetCounts(organizationId: string, input: CompanyListInput) {
 		const where = this.searchFilter(organizationId, input.q);
 
 		const [owners, industries, enrichment, sources] = await Promise.all([

@@ -124,7 +124,11 @@ export class ConversationsService {
 		return { id: conversation.id };
 	}
 
-	async events(organizationId: string, input: ConversationEventsInput, userId: string) {
+	async events(
+		organizationId: string,
+		input: ConversationEventsInput,
+		userId: string,
+	) {
 		const conversation = await this.db.agentConversation.findFirst({
 			where: { id: input.id, organizationId },
 			select: { sessionId: true, userId: true },
@@ -148,7 +152,11 @@ export class ConversationsService {
 		}));
 	}
 
-	async remove(organizationId: string, id: string, userId: string): Promise<{ id: string }> {
+	async remove(
+		organizationId: string,
+		id: string,
+		userId: string,
+	): Promise<{ id: string }> {
 		const conversation = await this.db.agentConversation.findFirst({
 			where: { id, organizationId },
 			select: {
