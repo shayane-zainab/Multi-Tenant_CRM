@@ -25,3 +25,5 @@ export function blankToNull(value: string): string | null {
 export function normalizeEmail(value: string): string | null {
 	return blankToNull(value)?.toLowerCase() ?? null;
 }
+
+export { normalizePhone } from "./phone";

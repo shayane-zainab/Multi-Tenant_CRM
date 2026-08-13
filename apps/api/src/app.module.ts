@@ -25,6 +25,7 @@ import { SsoModule } from "./sso/sso.module";
 import { TelemetryModule } from "./telemetry/telemetry.module";
 import { TrpcModule } from "./trpc/trpc.module";
 import { UsersModule } from "./users/users.module";
+import { WhatsAppModule } from "./whatsapp/whatsapp.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 
 @Module({
@@ -52,6 +53,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		DashboardModule,
 		SearchModule,
 		GoogleModule,
+		WhatsAppModule,
 		SettingsModule,
 		WorkspaceModule,
 		SsoModule,

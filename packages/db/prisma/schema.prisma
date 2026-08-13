@@ -22,13 +22,15 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  ownedCompanies Company[]           @relation("CompanyOwner")
-  ownedContacts  Contact[]           @relation("ContactOwner")
-  ownedDeals     Deal[]              @relation("DealOwner")
-  activities     Activity[]          @relation("ActivityAuthor")
-  mailboxSyncs   MailboxSync[]
-  factDecisions  ContactFact[]       @relation("FactDecider")
-  conversations  AgentConversation[] @relation("ConversationOwner")
+  ownedCompanies   Company[]           @relation("CompanyOwner")
+  ownedContacts    Contact[]           @relation("ContactOwner")
+  ownedDeals       Deal[]              @relation("DealOwner")
+  activities       Activity[]          @relation("ActivityAuthor")
+  mailboxSyncs     MailboxSync[]
+  factDecisions    ContactFact[]       @relation("FactDecider")
+  conversations    AgentConversation[] @relation("ConversationOwner")
+  whatsAppMessages    WhatsAppMessage[]    @relation("WhatsAppSender")
+  whatsAppConnections WhatsAppConnection[] @relation("WhatsAppOwner")
 
   ssoproviders SsoProvider[]
   members      Member[]
@@ -116,6 +118,7 @@ enum ActivityType {
   TASK
   STAGE_CHANGE
   ENRICHMENT
+  WHATSAPP
 }
 
 enum EnrichmentStatus {
@@ -131,6 +134,26 @@ enum RecordSource {
   IMPORT
   EMAIL
   CALENDAR
+  WHATSAPP
+}
+
+enum WhatsAppDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppSyncStatus {
+  IDLE
+  NEEDS_RECONNECT
+  FAILED
+}
+
+enum WhatsAppDeliveryStatus {
+  ACCEPTED
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }
 
 model Company {
@@ -176,13 +199,14 @@ model Company {
 
   lastActivityAt DateTime?
 
-  contacts       Contact[]           @relation("CompanyContacts")
-  conversations  AgentConversation[]
-  deals          Deal[]
-  activities     Activity[]
-  emailThreads   EmailThread[]
-  calendarEvents CalendarEvent[]
-  createdAt      DateTime            @default(now())
+  contacts        Contact[]           @relation("CompanyContacts")
+  conversations   AgentConversation[]
+  deals           Deal[]
+  activities      Activity[]
+  emailThreads    EmailThread[]
+  calendarEvents  CalendarEvent[]
+  whatsAppThreads WhatsAppThread[]
+  createdAt       DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   organizationId String
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -241,6 +265,7 @@ model Contact {
   activities      Activity[]
   emailThreads    EmailThread[]
   calendarEvents  CalendarEvent[]
+  whatsAppThreads WhatsAppThread[]
   eventAttendance CalendarAttendee[]
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -488,10 +513,12 @@ model Activity {
   createdBy   User   @relation("ActivityAuthor", fields: [createdById], references: [id])
   meta        Json?
 
-  emailThreadId   String?        @unique
-  emailThread     EmailThread?   @relation(fields: [emailThreadId], references: [id], onDelete: Cascade)
-  calendarEventId String?        @unique
-  calendarEvent   CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
+  emailThreadId    String?         @unique
+  emailThread      EmailThread?    @relation(fields: [emailThreadId], references: [id], onDelete: Cascade)
+  calendarEventId  String?         @unique
+  calendarEvent    CalendarEvent?  @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
+  whatsAppThreadId String?         @unique
+  whatsAppThread   WhatsAppThread? @relation(fields: [whatsAppThreadId], references: [id], onDelete: Cascade)
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -653,6 +680,97 @@ model CalendarAttendee {
   @@map("calendarAttendee")
 }
 
+model WhatsAppConnection {
+  id            String  @id @default(cuid())
+  phoneNumberId String  @unique
+  wabaId        String?
+  displayPhone  String?
+  verifiedName  String?
+  accessToken   String?
+
+  status      WhatsAppSyncStatus @default(IDLE)
+  autoCreate  Boolean            @default(false)
+  lastEventAt DateTime?
+  lastError   String?
+
+  ownerId String
+  owner   User   @relation("WhatsAppOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  threads WhatsAppThread[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([ownerId])
+  @@map("whatsAppConnection")
+}
+
+model WhatsAppThread {
+  id           String             @id @default(cuid())
+  waId         String
+  connectionId String
+  connection   WhatsAppConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  profileName String?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  firstMessageAt DateTime
+  lastMessageAt  DateTime
+  messageCount   Int      @default(0)
+
+  messages WhatsAppMessage[]
+  activity Activity?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, waId])
+  @@index([companyId, lastMessageAt])
+  @@index([contactId, lastMessageAt])
+  @@index([organizationId, lastMessageAt])
+  @@map("whatsAppThread")
+}
+
+model WhatsAppMessage {
+  id       String         @id @default(cuid())
+  threadId String
+  thread   WhatsAppThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  waMessageId String
+  direction   WhatsAppDirection
+  kind        String
+  body        String?
+  caption     String?
+  mediaId     String?
+  mediaMime   String?
+  fromWaId    String
+  sentAt      DateTime
+
+  status      WhatsAppDeliveryStatus?
+  statusAt    DateTime?
+  failedCode  Int?
+  failedTitle String?
+
+  sentByUserId String?
+  sentBy       User?   @relation("WhatsAppSender", fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([threadId, waMessageId])
+  @@index([threadId, sentAt])
+  @@index([waMessageId])
+  @@map("whatsAppMessage")
+}
+
 model SuppressedDomain {
   domain         String       @id
   reason         String?
@@ -673,6 +791,17 @@ model SuppressedContact {
 
   @@index([organizationId])
   @@map("suppressedContact")
+}
+
+model SuppressedPhone {
+  phone          String       @id
+  reason         String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("suppressedPhone")
 }
 
 model OrgSetting {
@@ -737,11 +866,14 @@ model Organization {
   agentConversations AgentConversation[]
   deals              Deal[]
   activities         Activity[]
-  mailboxSyncs       MailboxSync[]
-  emailThreads       EmailThread[]
-  calendarEvents     CalendarEvent[]
+  mailboxSyncs        MailboxSync[]
+  emailThreads        EmailThread[]
+  calendarEvents      CalendarEvent[]
+  whatsAppConnections WhatsAppConnection[]
+  whatsAppThreads     WhatsAppThread[]
   suppressedDomains  SuppressedDomain[]
   suppressedContacts SuppressedContact[]
+  suppressedPhones   SuppressedPhone[]
   orgSettings        OrgSetting[]
   workspaceProfiles  WorkspaceProfile[]
   members            Member[]

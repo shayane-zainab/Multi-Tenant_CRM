@@ -4,7 +4,7 @@ import type * as React from "react";
 
 function ThreadMessage({
 	from,
-	fromEmail,
+	fromHandle,
 	fromImageUrl,
 	sentAt,
 	direction,
@@ -14,7 +14,7 @@ function ThreadMessage({
 	...props
 }: Omit<React.ComponentProps<"article">, "children"> & {
 	from: string;
-	fromEmail: string;
+	fromHandle: string;
 	fromImageUrl?: string | null;
 	sentAt: string;
 	direction: "INBOUND" | "OUTBOUND";
@@ -37,7 +37,7 @@ function ThreadMessage({
 			<PersonAvatar
 				src={fromImageUrl}
 				name={from}
-				email={fromEmail}
+				email={fromHandle}
 				size="sm"
 				className="mt-0.5"
 			/>
@@ -46,7 +46,7 @@ function ThreadMessage({
 				<div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
 					<span className="font-medium text-xs">{from}</span>
 					<span className="truncate text-muted-foreground text-xs">
-						{fromEmail}
+						{fromHandle}
 					</span>
 					<span className="ml-auto text-muted-foreground text-xs">
 						{sentAt}
