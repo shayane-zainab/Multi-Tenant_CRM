@@ -57,6 +57,7 @@ Call `identify_contact` with what you actually saw:
 | --- | --- | --- |
 | Both checks pass | `linkedin.employer-and-name` | Written to the record. |
 | They replied from that address | `crm.thread-reply` | Written to the record. |
+| They messaged from that number on WhatsApp | `crm.whatsapp-reply` | Written to the record. |
 | One check passes | `employer-only`, or the profile as `search.cites-profile` | Offered to a rep as a suggestion. |
 | Sources disagree | add a `contradiction` entry | Held. Nobody is shown a guess. |
 

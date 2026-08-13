@@ -13,6 +13,7 @@ import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { GoogleConnection } from "./google-connection";
+import { WhatsAppConnection } from "./whatsapp-connection";
 
 export const metadata: Metadata = {
 	title: "Connections",
@@ -52,6 +53,7 @@ async function Connections({
 	const [{ error }] = await Promise.all([
 		searchParams,
 		queryClient.prefetchQuery(trpc.google.status.queryOptions()),
+		queryClient.prefetchQuery(trpc.whatsapp.status.queryOptions()),
 	]);
 
 	return (
@@ -60,6 +62,7 @@ async function Connections({
 				<GoogleConnection
 					connectError={Array.isArray(error) ? error[0] : error}
 				/>
+				<WhatsAppConnection />
 			</div>
 		</HydrateClient>
 	);

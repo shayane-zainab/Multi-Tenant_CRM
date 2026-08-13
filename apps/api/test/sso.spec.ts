@@ -56,7 +56,9 @@ describe("who may configure SSO", () => {
 	it("lets an owner and an admin", async () => {
 		for (const role of ["owner", "admin"]) {
 			const { sso } = service(role);
-			expect((await sso.settings(organizationId, "u1")).canConfigure).toBe(true);
+			expect((await sso.settings(organizationId, "u1")).canConfigure).toBe(
+				true,
+			);
 		}
 	});
 

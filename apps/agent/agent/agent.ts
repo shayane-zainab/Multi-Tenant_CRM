@@ -17,9 +17,10 @@ export default defineAgent({
 		fallback: DEFAULT_AGENT_MODEL.id,
 		events: {
 			"session.started": (_, ctx) => {
-				const organizationId = ctx.session.auth.current?.attributes?.organizationId as string | undefined;
+				const organizationId = ctx.session.auth.current?.attributes
+					?.organizationId as string | undefined;
 				return selectedModel(organizationId);
-			}
+			},
 		},
 	}),
 });

@@ -18,7 +18,10 @@ export class EnrichmentLogService {
 		private readonly stamp: ActivityStampService,
 	) {}
 
-	async record(organizationId: string, event: EnrichmentEvent): Promise<string | null> {
+	async record(
+		organizationId: string,
+		event: EnrichmentEvent,
+	): Promise<string | null> {
 		const author = await this.authorFor(event);
 		if (!author) return null;
 

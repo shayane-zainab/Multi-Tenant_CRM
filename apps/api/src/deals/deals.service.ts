@@ -203,13 +203,22 @@ export class DealsService {
 			throw new NotFoundException(`No deal with id ${id}.`);
 		}
 
-		const { contacts, amount, baseAmount, fxRate, fxRateAt, organizationId: _, ...rest } = deal;
+		const {
+			contacts,
+			amount,
+			baseAmount,
+			fxRate,
+			fxRateAt,
+			organizationId: _,
+			...rest
+		} = deal;
 
 		return {
 			...rest,
 			amountCents: toCents(amount),
 			baseAmountCents: toCents(baseAmount),
-			reportingCurrency: await this.conversion.reportingCurrency(organizationId),
+			reportingCurrency:
+				await this.conversion.reportingCurrency(organizationId),
 			fxRate: fxRate?.toNumber() ?? null,
 			fxRateAt: fxRateAt?.toISOString() ?? null,
 			stageChangedAt: deal.stageChangedAt.toISOString(),
@@ -226,7 +235,8 @@ export class DealsService {
 		const now = new Date();
 
 		const currency = normalizeCurrency(
-			input.currency ?? (await this.conversion.reportingCurrency(organizationId)),
+			input.currency ??
+				(await this.conversion.reportingCurrency(organizationId)),
 		);
 		const fx = await this.conversion.dealFields(
 			organizationId,
@@ -252,7 +262,12 @@ export class DealsService {
 				select: { id: true, name: true, companyId: true },
 			});
 
-			this.logger.log({ message: "Deal created", dealId: deal.id, stage, organizationId });
+			this.logger.log({
+				message: "Deal created",
+				dealId: deal.id,
+				stage,
+				organizationId,
+			});
 
 			return deal;
 		} catch (error) {
@@ -303,7 +318,10 @@ export class DealsService {
 					? normalizeCurrency(input.currency)
 					: normalizeCurrency(current.currency);
 
-			Object.assign(data, await this.conversion.dealFields(organizationId, amount, currency));
+			Object.assign(
+				data,
+				await this.conversion.dealFields(organizationId, amount, currency),
+			);
 		}
 
 		try {
@@ -447,7 +465,10 @@ export class DealsService {
 		organizationId: string,
 		input: DealListInput,
 	): Prisma.DealWhereInput {
-		const where: Prisma.DealWhereInput = this.searchFilter(organizationId, input.q);
+		const where: Prisma.DealWhereInput = this.searchFilter(
+			organizationId,
+			input.q,
+		);
 
 		if (input.owner !== FACET_ALL) {
 			where.ownerId =
@@ -471,10 +492,7 @@ export class DealsService {
 		return where;
 	}
 
-	private async facetCounts(
-		organizationId: string,
-		input: DealListInput,
-	) {
+	private async facetCounts(organizationId: string, input: DealListInput) {
 		const where = this.searchFilter(organizationId, input.q);
 
 		const [owners, stages, ...closingCounts] = await Promise.all([

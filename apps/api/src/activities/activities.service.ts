@@ -55,6 +55,15 @@ const ENTRY_SELECT = {
 			_count: { select: { attendees: true } },
 		},
 	},
+	whatsAppThread: {
+		select: {
+			id: true,
+			waId: true,
+			profileName: true,
+			messageCount: true,
+			lastMessageAt: true,
+		},
+	},
 } as const;
 
 const NOTE_TYPES = [
@@ -62,6 +71,7 @@ const NOTE_TYPES = [
 	ActivityType.CALL,
 	ActivityType.EMAIL,
 	ActivityType.MEETING,
+	ActivityType.WHATSAPP,
 ];
 
 @Injectable()
@@ -310,6 +320,16 @@ function serializeEntry(entry: Entry) {
 					location: entry.calendarEvent.location,
 					conferenceUrl: entry.calendarEvent.conferenceUrl,
 					attendeeCount: entry.calendarEvent._count.attendees,
+				}
+			: null,
+
+		whatsAppThread: entry.whatsAppThread
+			? {
+					id: entry.whatsAppThread.id,
+					waId: entry.whatsAppThread.waId,
+					profileName: entry.whatsAppThread.profileName,
+					messageCount: entry.whatsAppThread.messageCount,
+					lastMessageAt: entry.whatsAppThread.lastMessageAt.toISOString(),
 				}
 			: null,
 	};

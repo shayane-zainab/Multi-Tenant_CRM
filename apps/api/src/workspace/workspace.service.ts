@@ -258,7 +258,10 @@ export class WorkspaceService {
 		};
 	}
 
-	private searchWhere(organizationId: string, q: string): Prisma.MemberWhereInput {
+	private searchWhere(
+		organizationId: string,
+		q: string,
+	): Prisma.MemberWhereInput {
 		const term = q.trim();
 		const where: Prisma.MemberWhereInput = { organizationId };
 
@@ -274,7 +277,10 @@ export class WorkspaceService {
 		return where;
 	}
 
-	private buildWhere(organizationId: string, input: MemberListInput): Prisma.MemberWhereInput {
+	private buildWhere(
+		organizationId: string,
+		input: MemberListInput,
+	): Prisma.MemberWhereInput {
 		const where = this.searchWhere(organizationId, input.q);
 
 		if (input.role !== FACET_ALL) {
@@ -297,7 +303,10 @@ export class WorkspaceService {
 		});
 	}
 
-	private async roleOf(organizationId: string, userId: string): Promise<WorkspaceRole | null> {
+	private async roleOf(
+		organizationId: string,
+		userId: string,
+	): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
 				organizationId_userId: { organizationId, userId },

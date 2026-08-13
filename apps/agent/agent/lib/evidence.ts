@@ -4,6 +4,7 @@ export type EvidenceKind =
 	| "profile.email-match"
 	| "linkedin.employer-and-name"
 	| "crm.thread-reply"
+	| "crm.whatsapp-reply"
 	| "crm.signature-block"
 	| "github.account-identity"
 	| "crm.meeting-attendance"
@@ -34,6 +35,11 @@ export const WEIGHTS: Record<EvidenceKind, Weighting> = {
 		weight: 0.85,
 		primary: true,
 		label: "they replied on a thread we have",
+	},
+	"crm.whatsapp-reply": {
+		weight: 0.85,
+		primary: true,
+		label: "they replied on WhatsApp from their own number",
 	},
 	"crm.signature-block": {
 		weight: 0.8,

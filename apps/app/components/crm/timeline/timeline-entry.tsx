@@ -15,6 +15,7 @@ import { ActivityIcon, activityLabel } from "./activity-icon";
 import { EmailThreadEntry } from "./email-thread-entry";
 import { MeetingEntry } from "./meeting-entry";
 import type { TimelineAnchor } from "./timeline";
+import { WhatsAppThreadEntry } from "./whatsapp-thread-entry";
 
 export type TimelineEntryData =
 	RouterOutputs["activities"]["timeline"]["entries"][number];
@@ -68,7 +69,9 @@ export function TimelineEntry({
 	const author = synced
 		? entry.emailThread
 			? "via Gmail"
-			: "via Calendar"
+			: entry.whatsAppThread
+				? "via WhatsApp"
+				: "via Calendar"
 		: entry.createdBy.name;
 
 	const headline = change
@@ -158,6 +161,15 @@ export function TimelineEntry({
 					<EmailThreadEntry
 						threadId={entry.emailThread.id}
 						messageCount={entry.emailThread.messageCount}
+					/>
+				) : null}
+
+				{entry.whatsAppThread ? (
+					<WhatsAppThreadEntry
+						threadId={entry.whatsAppThread.id}
+						waId={entry.whatsAppThread.waId}
+						profileName={entry.whatsAppThread.profileName}
+						messageCount={entry.whatsAppThread.messageCount}
 					/>
 				) : null}
 

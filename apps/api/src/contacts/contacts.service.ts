@@ -20,7 +20,12 @@ import {
 	ActivityStampService,
 	type StampTargets,
 } from "../crm/activity-stamp.service";
-import { blankToNull, normalizeEmail, toCents } from "../crm/values";
+import {
+	blankToNull,
+	normalizeEmail,
+	normalizePhone,
+	toCents,
+} from "../crm/values";
 import { InjectDatabase } from "../database/database.constants";
 import {
 	countsByKey,
@@ -232,7 +237,15 @@ export class ContactsService {
 			contact.company?.id ?? null,
 		);
 
-		const { deals, createdAt, brief, facts, company, organizationId: _, ...rest } = contact;
+		const {
+			deals,
+			createdAt,
+			brief,
+			facts,
+			company,
+			organizationId: _,
+			...rest
+		} = contact;
 
 		return {
 			...rest,
@@ -291,6 +304,7 @@ export class ContactsService {
 
 		const contact = await this.db.$transaction(async (tx) => {
 			await this.allowAgain(tx, email);
+			await this.allowPhoneAgain(tx, normalizePhone(input.phone));
 
 			return tx.contact.create({
 				data: {
@@ -307,7 +321,11 @@ export class ContactsService {
 			});
 		});
 
-		this.logger.log({ message: "Contact created", contactId: contact.id, organizationId });
+		this.logger.log({
+			message: "Contact created",
+			contactId: contact.id,
+			organizationId,
+		});
 
 		await this.agent.contactCreated(
 			organizationId,
@@ -346,13 +364,19 @@ export class ContactsService {
 
 				const contact = await tx.contact.delete({
 					where: { id },
-					select: { firstName: true, lastName: true, email: true },
+					select: {
+						firstName: true,
+						lastName: true,
+						email: true,
+						phone: true,
+					},
 				});
 
 				const name = [contact.firstName, contact.lastName]
 					.filter(Boolean)
 					.join(" ");
 				const suppress = normalizeEmail(contact.email ?? "");
+				const suppressPhone = normalizePhone(contact.phone);
 
 				if (suppress) {
 					await tx.suppressedContact.upsert({
@@ -366,7 +390,23 @@ export class ContactsService {
 					});
 				}
 
-				return { targets, name, suppressed: suppress !== null };
+				if (suppressPhone) {
+					await tx.suppressedPhone.upsert({
+						where: { phone: suppressPhone },
+						create: {
+							organizationId,
+							phone: suppressPhone,
+							reason: `Deleted from the CRM (${name})`,
+						},
+						update: {},
+					});
+				}
+
+				return {
+					targets,
+					name,
+					suppressed: suppress !== null || suppressPhone !== null,
+				};
 			});
 		} catch (error) {
 			throw this.translate(error, id);
@@ -425,6 +465,10 @@ export class ContactsService {
 					await this.allowAgain(tx, data.email);
 				}
 
+				if (typeof data.phone === "string") {
+					await this.allowPhoneAgain(tx, normalizePhone(data.phone));
+				}
+
 				return updated;
 			});
 		} catch (error) {
@@ -440,6 +484,14 @@ export class ContactsService {
 		await tx.suppressedContact.deleteMany({
 			where: { email: { equals: email, mode: "insensitive" } },
 		});
+	}
+
+	private async allowPhoneAgain(
+		tx: Prisma.TransactionClient,
+		phone: string | null,
+	): Promise<void> {
+		if (!phone) return;
+		await tx.suppressedPhone.deleteMany({ where: { phone } });
 	}
 
 	private async relationship(contactId: string, companyId: string | null) {
@@ -512,7 +564,12 @@ export class ContactsService {
 	): Promise<{ id: string; queued: true }> {
 		const contact = await this.db.contact.findUnique({
 			where: { id },
-			select: { id: true, organizationId: true, imageUrl: true, linkedinUrl: true },
+			select: {
+				id: true,
+				organizationId: true,
+				imageUrl: true,
+				linkedinUrl: true,
+			},
 		});
 
 		if (!contact || contact.organizationId !== organizationId) {
@@ -656,10 +713,7 @@ export class ContactsService {
 		return where;
 	}
 
-	private async facetCounts(
-		organizationId: string,
-		input: ContactListInput,
-	) {
+	private async facetCounts(organizationId: string, input: ContactListInput) {
 		const where = this.searchFilter(organizationId, input.q);
 
 		const [owners, companies, sources] = await Promise.all([

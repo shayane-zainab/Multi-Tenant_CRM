@@ -131,6 +131,23 @@ feature is only ever wrong), **no `GOOGLE_WORKSPACE_DOMAIN`** (`ALLOWED_SIGN_IN`
 says who is internal — two sources is how a colleague becomes a lead), **no
 `GMAIL_BACKFILL_DAYS`**, **no rate provider variable**.
 
+## WhatsApp
+
+**`WHATSAPP_VERIFY_TOKEN`** and **`WHATSAPP_APP_SECRET`** together turn the feature on;
+either missing and `/internal/whatsapp/webhook` answers 503 and nothing else changes.
+The verify token is echoed once during Meta's subscription handshake; the app secret
+signs every body afterwards and **fails closed** when unset.
+
+**`WHATSAPP_ACCESS_TOKEN` is a fallback, not the source.** Which number belongs to
+which workspace is a `whatsAppConnection` row — one deployment serves every tenant, and
+a self-hoster's admin cannot redeploy to add a number. The row's `accessToken` wins;
+the variable exists for a single-tenant install that would rather keep it in the
+environment. Unset, inbound still works and only replying from the CRM is unavailable.
+
+Deliberate absences: **no `WHATSAPP_PHONE_NUMBER_ID`** (it is the tenancy key, so it
+has to be a row), and **no `WHATSAPP_ENABLED`** — presence of the two required values
+is the switch.
+
 ## Telemetry is on, and turning it off is one variable
 
 `CRM_TELEMETRY_DISABLED="1"` — or `DO_NOT_TRACK=1`, honoured identically — and nothing

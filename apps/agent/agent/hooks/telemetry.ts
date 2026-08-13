@@ -72,7 +72,8 @@ export default defineHook({
 		async "step.failed"(event, ctx) {
 			if (!looksLikeModel(event.data.code)) return;
 
-			const organizationId = ctx.session.auth.current?.attributes?.organizationId as string | undefined;
+			const organizationId = ctx.session.auth.current?.attributes
+				?.organizationId as string | undefined;
 
 			modelError({
 				error: event.data.code,

@@ -7,7 +7,9 @@ async function main() {
 	const website = process.argv[4];
 
 	if (!name || !adminEmail) {
-		console.error("Usage: bun run scripts/create-org.ts <name> <adminEmail> [website]");
+		console.error(
+			"Usage: bun run scripts/create-org.ts <name> <adminEmail> [website]",
+		);
 		process.exit(1);
 	}
 
@@ -17,7 +19,9 @@ async function main() {
 
 	const user = await db.user.findUnique({ where: { email: adminEmail } });
 	if (!user) {
-		console.error(`User with email ${adminEmail} not found. They must sign in first.`);
+		console.error(
+			`User with email ${adminEmail} not found. They must sign in first.`,
+		);
 		process.exit(1);
 	}
 
@@ -46,7 +50,9 @@ async function main() {
 		},
 	});
 
-	console.log(`Successfully created organization ${name} and added ${adminEmail} as owner.`);
+	console.log(
+		`Successfully created organization ${name} and added ${adminEmail} as owner.`,
+	);
 }
 
 main().catch((e) => {
