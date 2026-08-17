@@ -1,4 +1,5 @@
 import { db, EnrichmentStatus } from "@crm/db";
+import { currentFocus } from "./focus";
 import { domainOf, isDerivedName } from "./names";
 import type { Person } from "./socials";
 
@@ -18,8 +19,12 @@ export type WorkItem = {
 };
 
 export async function contactsNeedingWork(limit: number): Promise<WorkItem[]> {
+	const { organizationId } = currentFocus();
+	if (!organizationId) return [];
+
 	const rows = await db.contact.findMany({
 		where: {
+			organizationId,
 			OR: [
 				{ brief: { is: null } },
 				{ socialsCheckedAt: null },
