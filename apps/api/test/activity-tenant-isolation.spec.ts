@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
 import { ActivitiesService } from "../src/activities/activities.service";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
+import { ConversationService } from "../src/google/conversation.service";
 
 const suffix = process.env.TEST_RUN_ID ?? "activity-isolation-spec";
 const orgA = `org-a-${suffix}`;
@@ -11,15 +12,20 @@ const email = `tester@isolation-${suffix}.test`;
 
 const stamp = new ActivityStampService(db);
 const activities = new ActivitiesService(db, stamp);
+const conversations = new ConversationService(db);
 
 let companyB = "";
 let contactB = "";
 let dealB = "";
+let threadB = "";
+let eventB = "";
 
 async function clean() {
 	const orgs = { organizationId: { in: [orgA, orgB] } };
 
 	await db.activity.deleteMany({ where: orgs });
+	await db.emailThread.deleteMany({ where: orgs });
+	await db.calendarEvent.deleteMany({ where: orgs });
 	await db.deal.deleteMany({ where: orgs });
 	await db.contact.deleteMany({ where: orgs });
 	await db.company.deleteMany({ where: orgs });
@@ -82,11 +88,37 @@ beforeAll(async () => {
 		select: { id: true },
 	});
 	dealB = deal.id;
-});
+
+	const thread = await db.emailThread.create({
+		data: {
+			organizationId: orgB,
+			rootMessageId: `root-${suffix}`,
+			subject: "Tenant B's private thread",
+			firstMessageAt: now,
+			lastMessageAt: now,
+		},
+		select: { id: true },
+	});
+	threadB = thread.id;
+
+	const event = await db.calendarEvent.create({
+		data: {
+			organizationId: orgB,
+			iCalUid: `ical-${suffix}`,
+			originalStartTime: now,
+			title: "Tenant B's private meeting",
+			startsAt: now,
+			endsAt: now,
+			status: "confirmed",
+		},
+		select: { id: true },
+	});
+	eventB = event.id;
+}, 120_000);
 
 afterAll(async () => {
 	await clean();
-});
+}, 120_000);
 
 describe("one tenant cannot attach an activity to another tenant's records", () => {
 	it("refuses a deal belonging to someone else", async () => {
@@ -121,6 +153,28 @@ describe("one tenant cannot attach an activity to another tenant's records", () 
 		});
 
 		expect(deal?.lastActivityAt).toBeNull();
+	});
+});
+
+describe("email and calendar detail never crosses organizations", () => {
+	it("refuses an email thread belonging to someone else", async () => {
+		await expect(conversations.thread(orgA, threadB)).rejects.toThrow(
+			`No email thread with id ${threadB}.`,
+		);
+	});
+
+	it("refuses a calendar event belonging to someone else", async () => {
+		await expect(conversations.event(orgA, eventB)).rejects.toThrow(
+			`No calendar event with id ${eventB}.`,
+		);
+	});
+
+	it("still returns them to the organization that owns them", async () => {
+		const thread = await conversations.thread(orgB, threadB);
+		const event = await conversations.event(orgB, eventB);
+
+		expect(thread.subject).toBe("Tenant B's private thread");
+		expect(event.title).toBe("Tenant B's private meeting");
 	});
 });
 

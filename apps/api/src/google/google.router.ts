@@ -77,12 +77,18 @@ export class GoogleRouter {
 	}
 
 	@Query({ input: threadInput })
-	async thread(@Input("threadId") threadId: string) {
-		return this.conversations.thread(threadId);
+	async thread(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input("threadId") threadId: string,
+	) {
+		return this.conversations.thread(ctx.organizationId, threadId);
 	}
 
 	@Query({ input: calendarEventInput })
-	async event(@Input("eventId") eventId: string) {
-		return this.conversations.event(eventId);
+	async event(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input("eventId") eventId: string,
+	) {
+		return this.conversations.event(ctx.organizationId, eventId);
 	}
 }

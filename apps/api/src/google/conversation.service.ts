@@ -6,9 +6,9 @@ import { InjectDatabase } from "../database/database.constants";
 export class ConversationService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async thread(threadId: string) {
-		const thread = await this.db.emailThread.findUnique({
-			where: { id: threadId },
+	async thread(organizationId: string, threadId: string) {
+		const thread = await this.db.emailThread.findFirst({
+			where: { id: threadId, organizationId },
 			select: {
 				id: true,
 				subject: true,
@@ -40,6 +40,7 @@ export class ConversationService {
 		}
 
 		const faces = await this.facesFor(
+			organizationId,
 			thread.messages.map((message) => message.fromEmail),
 		);
 
@@ -59,7 +60,10 @@ export class ConversationService {
 		};
 	}
 
-	private async facesFor(addresses: string[]): Promise<Map<string, string>> {
+	private async facesFor(
+		organizationId: string,
+		addresses: string[],
+	): Promise<Map<string, string>> {
 		const emails = [
 			...new Set(addresses.map((address) => address.toLowerCase())),
 		];
@@ -67,7 +71,7 @@ export class ConversationService {
 
 		const [contacts, users] = await Promise.all([
 			this.db.contact.findMany({
-				where: { email: { in: emails, mode: "insensitive" } },
+				where: { organizationId, email: { in: emails, mode: "insensitive" } },
 				select: { email: true, imageUrl: true },
 			}),
 			this.db.user.findMany({
@@ -89,9 +93,9 @@ export class ConversationService {
 		return faces;
 	}
 
-	async event(eventId: string) {
-		const event = await this.db.calendarEvent.findUnique({
-			where: { id: eventId },
+	async event(organizationId: string, eventId: string) {
+		const event = await this.db.calendarEvent.findFirst({
+			where: { id: eventId, organizationId },
 			select: {
 				id: true,
 				title: true,
