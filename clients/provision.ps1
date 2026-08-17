@@ -14,23 +14,17 @@
 .PARAMETER ClientName
     Human-readable name, e.g. "Acme Corp". Used in the directory and as a label.
 
-.PARAMETER AllowedSignIn
-    Who can sign in. Comma-separated domains or addresses, e.g. "acme.com".
-
 .PARAMETER Subdomain
     Override the auto-generated subdomain. Defaults to a slug of ClientName.
 
 .EXAMPLE
-    .\provision.ps1 -ClientName "Acme Corp" -AllowedSignIn "acme.com"
-    .\provision.ps1 -ClientName "Acme Corp" -AllowedSignIn "admin@acme.com" -Subdomain "acme"
+    .\provision.ps1 -ClientName "Acme Corp"
+    .\provision.ps1 -ClientName "Acme Corp" -Subdomain "acme"
 #>
 
 param(
     [Parameter(Mandatory)]
     [string]$ClientName,
-
-    [Parameter(Mandatory)]
-    [string]$AllowedSignIn,
 
     [string]$Subdomain = ""
 )
@@ -116,7 +110,6 @@ $env = $envTemplate `
     -replace '__DB_PORT__',         $dbPort `
     -replace '__DB_NAME__',         $dbName `
     -replace '__BETTER_AUTH_SECRET__', $authSecret `
-    -replace '__ALLOWED_SIGN_IN__', $AllowedSignIn `
     -replace '__CLIENT_SUBDOMAIN__', $slug `
     -replace '__AGENT_PORT__',      $agentPort `
     -replace '__AGENT_BRIDGE_SECRET__', $bridgeSecret `
@@ -195,7 +188,6 @@ Write-Host "  [5/5] All containers running" -ForegroundColor Green
 $record = [PSCustomObject]@{
     slug          = $slug
     name          = $ClientName
-    allowedSignIn = $AllowedSignIn
     subdomain     = "$slug.aristral.com"
     dbPort        = $dbPort
     apiPort       = $apiPort
@@ -220,5 +212,4 @@ Write-Host "  3. Issue SSL: certbot --nginx -d $slug.aristral.com" -ForegroundCo
 Write-Host "  4. Reload nginx: nginx -s reload" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  App URL : https://$slug.aristral.com" -ForegroundColor Cyan
-Write-Host "  Sign-in : $AllowedSignIn" -ForegroundColor Cyan
 Write-Host ""

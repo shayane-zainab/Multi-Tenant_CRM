@@ -40,7 +40,7 @@ On your server (Linux VPS recommended):
 ```powershell
 cd d:\Aristral\CRM\clients
 
-.\provision.ps1 -ClientName "Acme Corp" -AllowedSignIn "acme.com"
+.\provision.ps1 -ClientName "Acme Corp"
 ```
 
 This will:
@@ -56,14 +56,12 @@ This will:
 
 ```powershell
 # Set a custom subdomain (default: slugified ClientName)
-.\provision.ps1 -ClientName "Acme Corp" -AllowedSignIn "acme.com" -Subdomain "acme"
-
-# Allow a specific email address instead of a whole domain
-.\provision.ps1 -ClientName "Freelancer" -AllowedSignIn "bob@gmail.com"
-
-# Allow multiple domains/addresses
-.\provision.ps1 -ClientName "Big Co" -AllowedSignIn "bigco.com,contractor@gmail.com"
+.\provision.ps1 -ClientName "Acme Corp" -Subdomain "acme"
 ```
+
+An instance does not restrict who may sign in. Anyone who completes the Google or SSO
+flow gets an account on it and an organization of their own. Narrow that on the OAuth
+consent screen for the client's Google project, not here.
 
 ## Listing All Clients
 

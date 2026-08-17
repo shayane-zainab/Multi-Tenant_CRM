@@ -32,9 +32,3 @@ export {
 	ssoCallbackURL,
 	ssoProviderName,
 } from "./sso";
-export {
-	hasSignInAllowList,
-	isWorkspaceEmail,
-	primaryWorkspaceDomain,
-	workspaceDomains,
-} from "./workspace";

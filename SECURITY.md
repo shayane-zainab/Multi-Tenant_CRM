@@ -13,18 +13,23 @@ project and there is no bounty.
 
 ## What this is, and what it assumes
 
-This CRM is built for **one organisation of authenticated internal users**. It is not a hardened
-public or multi-tenant service boundary, and the design says so out loud in a few places. The
-limits below are real and worth reading before you put customer data in it.
+This CRM is multi-tenant. `Organization` is the tenancy boundary and `organizationId` filters every
+read and write. The limits below are real and worth reading before you put customer data in it.
 
-**Sign-in is the entire authorisation model.** `ALLOWED_SIGN_IN` decides who gets in; after that,
-every signed-in person can read and write every record. There are no roles, no per-record
-permissions and no organizations — deliberately, because a permissions check that always returns
-`true` reads like a real one at review time. If you need someone to see only part of the pipeline,
-this is the wrong tool today.
+**Sign-up is open, and the identity provider is the only gate.** Anyone who completes the Google or
+SSO flow gets an account and a brand-new organization of their own, with the `owner` role. This
+repo holds no allow-list. Whether a stranger can start that flow at all is decided on the Google
+OAuth consent screen — **Internal** admits only your Workspace domain, **External** admits anyone
+with a Google account. Configure it there deliberately; nothing in the code will stop them.
 
-An unset `ALLOWED_SIGN_IN` fails closed: nobody can sign in. A list that names a consumer domain
-(`gmail.com`) is an open door, which is why single addresses are supported.
+**Inside an organization there are no per-record permissions.** Every member reads and writes every
+record belonging to that organization. The `owner`/`admin`/`member` roles gate workspace-level
+actions only — renaming, changing someone's role, currency, WhatsApp — not record access. If you
+need someone to see only part of the pipeline, this is the wrong tool today.
+
+**Isolation between organizations is a query filter, not a database boundary.** Every tenant's rows
+share the same tables, kept apart by `organizationId` coming from the session. A service that
+forgets that filter leaks across tenants, and nothing below it will catch the mistake.
 
 **Operators can read everything.** Whoever runs the deployment has the database, the environment
 and the logs. Nothing here protects data from the person hosting it.
@@ -51,7 +56,8 @@ every session at once.
 
 ## Deploying it safely
 
-- Set `ALLOWED_SIGN_IN` to a domain you control. Never a public mail provider.
+- Decide the OAuth consent screen's user type deliberately. **External** means anyone with a Google
+  account can sign up and provision themselves an organization.
 - Generate `BETTER_AUTH_SECRET` yourself (`openssl rand -base64 32`). The value in any example file
   is not a secret.
 - Serve both processes over HTTPS. Secure cookies switch on with `NODE_ENV=production`.

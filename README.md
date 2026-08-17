@@ -151,7 +151,7 @@ A [Turborepo](https://turborepo.dev) monorepo on [Bun](https://bun.com), deploye
 | **Front end** | [Next.js](https://nextjs.org) App Router · [shadcn/ui](https://ui.shadcn.com) · [nuqs](https://nuqs.dev) for URL state |
 | **API** | [NestJS](https://nestjs.com) with [nestjs-trpc](https://nestjs-trpc.io) — HTTP, auth, tRPC, Google sync |
 | **Data** | [Prisma](https://prisma.io) · Postgres ([Neon](https://neon.tech)) · optional Redis ([Upstash](https://upstash.com)) |
-| **Auth** | [Better Auth](https://better-auth.com), Google-only, one allow-list |
+| **Auth** | [Better Auth](https://better-auth.com), Google or SSO, open sign-up |
 | **Files** | [Vercel Blob](https://vercel.com/docs/vercel-blob) — mirrors profile pictures so they survive the source going away |
 | **Tooling** | [Biome](https://biomejs.dev) · TypeScript everywhere |
 
@@ -168,7 +168,7 @@ reproduces the view.
 | `apps/app` | Next.js front end · :3000 |
 | `apps/api` | NestJS API — HTTP, auth, tRPC, Google sync · :3001 |
 | `packages/db` | Prisma schema, migrations, shared Postgres client |
-| `packages/auth` | Better Auth config and the sign-in allow-list |
+| `packages/auth` | Better Auth config, organization provisioning and roles |
 | `packages/ui` | shadcn/ui components, the Tailwind theme |
 | `packages/env` | Finds and loads the root `.env` |
 
@@ -211,7 +211,6 @@ Open `.env` and set these. Everything else in the file is optional and commented
 | Variable                                   | What to put in it                                                    |
 | ------------------------------------------ | -------------------------------------------------------------------- |
 | `BETTER_AUTH_SECRET`                       | `openssl rand -base64 32`                                             |
-| `ALLOWED_SIGN_IN`                          | Your email domain, e.g. `acme.com`. Or one address, e.g. `you@gmail.com`. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`| A Google OAuth client — 2 minutes, below. Both or neither.             |
 
 `DATABASE_URL` already matches the `docker compose` Postgres, so leave it alone unless
@@ -235,15 +234,11 @@ Google. If your account is on a Google Workspace domain, set the consent screen 
 
 </details>
 
-`ALLOWED_SIGN_IN` is the entire authorisation model — an unset value means nobody can
-sign in, which is the safe direction to fail. It takes whole domains, individual
-addresses, or a mix:
-
-```sh
-ALLOWED_SIGN_IN="acme.com"                       # everyone at your company
-ALLOWED_SIGN_IN="acme.com,contractor@gmail.com"  # …plus one outsider
-ALLOWED_SIGN_IN="you@gmail.com"                  # a one-person install
-```
+**Sign-up is open.** Anyone who completes the Google or SSO flow gets an account and a
+new organization of their own, with the `owner` role. There is no allow-list in this
+repo — who may reach the prompt at all is decided on the Google OAuth consent screen:
+set the user type to **Internal** and only your Workspace domain can sign in; set it to
+**External** and anyone with a Google account can.
 
 ## Configuration
 

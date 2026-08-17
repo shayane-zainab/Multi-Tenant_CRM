@@ -37,7 +37,7 @@ The CRM is multi-tenant. The tenancy boundary is the `Organization` (Workspace).
 
 - **The id comes from the session.** A function taking an `organizationId` parameter gets it from `ctx.organizationId` (provided by `AuthMiddleware`), never from the request body or parameters.
 - **Data Isolation:** All database reads and writes must explicitly filter by `organizationId`.
-- **Signing in is the join; no invite flow.** `ensureOrganizationMembership` runs in `databaseHooks.session.create.before` and assigns users to organizations based on allow-lists or domains.
+- **Signing in is the join; no invite flow.** `ensureOrganizationMembership` runs in `databaseHooks.session.create.before`. A user with no membership gets a **brand-new organization** and the `owner` role — it never joins them to an existing one, so two colleagues signing up independently land in separate workspaces.
 - **Permissions come from `@crm/auth`** — `canRenameWorkspace`, `canChangeRole` — enforced by the service *and* used to disable the UI control.
 - **The Google sync exception.** The `gmail-sync` and `calendar-sync` services run via cron and are not behind `AuthMiddleware`. They must derive `organizationId` from the `MailboxSync` row, not a session.
 - **The name starts as `DEFAULT_WORKSPACE_NAME` (`CRM`), a placeholder not an answer.** The header renders `<name> CRM`.
@@ -95,9 +95,9 @@ self-hoster's admin cannot redeploy.
   `/sign-in?method=google` still works, so a mistyped issuer cannot lock an admin out.
 - **Signing in with an IdP does not cost you Gmail.** `needsGoogleGrant` (`@crm/auth`)
   walls only an account whose sole sign-in row is Google.
-- `ALLOWED_SIGN_IN` still decides who gets an account, in
-  `databaseHooks.user.create.before`, for SSO sign-ups too.
-- `organizationProvisioning: { disabled: true }` — `ensureWorkspaceMembership` already
+- **Sign-up is open for SSO too** — there is no allow-list hook. Completing the flow
+  creates the account and its organization.
+- `organizationProvisioning: { disabled: true }` — `ensureOrganizationMembership` already
   does the join.
 
 ## tRPC is the data surface; REST is auth and health only

@@ -74,9 +74,10 @@ Create an OAuth client in the Google Cloud console and add
 `<API_URL>/api/auth/callback/google` — `http://localhost:3001/api/auth/callback/google`
 in development — as an authorised redirect URI.
 
-`ALLOWED_SIGN_IN` decides who may sign in, and an empty value admits nobody. It
-is the whole authorisation model: there are no roles and no organizations, so
-`src/workspace.ts` is worth reading before you change anything here.
+Sign-up is open: anyone who completes the flow gets an account, and
+`ensureOrganizationMembership` in `src/organization.ts` gives them a new
+organization with the `owner` role. Nothing here narrows who may sign in — that
+is the OAuth consent screen's user type, set in the Google Cloud console.
 
 ## Changing the schema
 

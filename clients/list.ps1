@@ -36,7 +36,6 @@ foreach ($client in $clients) {
 
     Write-Host "  $($client.name) ($($client.slug))" -ForegroundColor $overallColor
     Write-Host "    URL        : https://$($client.subdomain)" -ForegroundColor White
-    Write-Host "    Sign-in    : $($client.allowedSignIn)" -ForegroundColor DarkGray
     Write-Host "    Provisioned: $($client.provisionedAt)" -ForegroundColor DarkGray
     Write-Host "    Ports      : DB=$($client.dbPort)  API=$($client.apiPort)  App=$($client.appPort)  Agent=$($client.agentPort)" -ForegroundColor DarkGray
     Write-Host "    Containers : db=[$dbStatus]  api=[$apiStatus]  app=[$appStatus]  agent=[$agentStatus]" -ForegroundColor DarkGray

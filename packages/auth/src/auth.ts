@@ -2,18 +2,12 @@ import { sso } from "@better-auth/sso";
 import { db } from "@crm/db";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
 import { ensureOrganizationMembership } from "./organization";
 import { SYNC_SCOPES } from "./scopes";
 import { notifySignedIn } from "./signed-in";
-import {
-	hasSignInAllowList,
-	isWorkspaceEmail,
-	primaryWorkspaceDomain,
-} from "./workspace";
 
 const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
 
@@ -24,8 +18,6 @@ if (env.google) {
 		scope: [...SYNC_SCOPES],
 
 		accessType: "offline",
-
-		...(primaryWorkspaceDomain() ? { hd: primaryWorkspaceDomain() } : {}),
 	};
 }
 
@@ -102,30 +94,6 @@ export const auth = betterAuth({
 	],
 
 	databaseHooks: {
-		user: {
-			create: {
-				before: async (user) => {
-					if (!hasSignInAllowList()) {
-						throw new APIError("FORBIDDEN", {
-							message:
-								'No one can sign in yet: set ALLOWED_SIGN_IN in .env to your email domain (for example ALLOWED_SIGN_IN="acme.com") and restart.',
-						});
-					}
-
-					if (!isWorkspaceEmail(user.email)) {
-						const domain = primaryWorkspaceDomain();
-						throw new APIError("FORBIDDEN", {
-							message: domain
-								? `This CRM is private. Sign in with your @${domain} account.`
-								: "This CRM is private. That address is not on the allow-list.",
-						});
-					}
-
-					return { data: user };
-				},
-			},
-		},
-
 		session: {
 			create: {
 				before: async (session) => {

@@ -315,3 +315,37 @@ describe("isDerivedName", () => {
 		expect(isDerivedName("jane.doe@acme.com", "Jane", "Doherty")).toBe(false);
 	});
 });
+
+describe("internal addresses never become leads", () => {
+	const options = {
+		ourDomains: new Set(["acme.com"]),
+		ourAddresses: new Set<string>(),
+		suppressedDomains: new Set<string>(),
+		suppressedEmails: new Set<string>(),
+	};
+
+	it("drops colleagues even when they are not users", () => {
+		const result = externalParticipants(
+			[
+				{ email: "lewis@acme.com", name: "Lewis" },
+				{ email: "newstarter@acme.com", name: "New Starter" },
+				{ email: "jane@globex.com", name: "Jane" },
+			],
+			options,
+		);
+
+		expect(result.map((person) => person.email)).toEqual(["jane@globex.com"]);
+	});
+
+	it("stores nothing for a wholly internal thread", () => {
+		expect(
+			externalParticipants(
+				[
+					{ email: "lewis@acme.com", name: null },
+					{ email: "colleague@acme.com", name: null },
+				],
+				options,
+			),
+		).toEqual([]);
+	});
+});

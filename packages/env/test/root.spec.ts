@@ -67,7 +67,6 @@ describe("the committed .env.example", () => {
 		for (const key of [
 			"DATABASE_URL",
 			"BETTER_AUTH_SECRET",
-			"ALLOWED_SIGN_IN",
 			"GOOGLE_CLIENT_ID",
 			"GOOGLE_CLIENT_SECRET",
 		]) {
@@ -81,7 +80,6 @@ describe("the committed .env.example", () => {
 			const value = line.slice(line.indexOf("=") + 1).trim();
 			expect(value === '""' || value.length > 0).toBe(true);
 			if (line.startsWith("BETTER_AUTH_SECRET")) expect(value).toBe('""');
-			if (line.startsWith("ALLOWED_SIGN_IN")) expect(value).toBe('""');
 		}
 	});
 });

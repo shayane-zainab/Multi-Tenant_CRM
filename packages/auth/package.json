@@ -7,8 +7,7 @@
 		".": "./src/index.ts",
 		"./client": "./src/client.ts",
 		"./cookies": "./src/cookies.ts",
-		"./scopes": "./src/scopes.ts",
-		"./workspace": "./src/workspace.ts"
+		"./scopes": "./src/scopes.ts"
 	},
 	"scripts": {
 		"auth:generate": "better-auth generate --config src/auth.ts --output ../db/prisma/schema.prisma --y",

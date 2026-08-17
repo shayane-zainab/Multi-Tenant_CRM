@@ -39,7 +39,6 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/crm?schema=public
-      ALLOWED_SIGN_IN: example.com
       BETTER_AUTH_SECRET: ci-only-secret-regenerate-for-any-real-deployment
       API_URL: http://localhost:3001
       APP_URL: http://localhost:3000

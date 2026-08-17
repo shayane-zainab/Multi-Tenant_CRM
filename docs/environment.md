@@ -18,18 +18,19 @@ and nothing that is not read. `packages/env` walks up to the workspace root and 
 
 ## Required
 
-`DATABASE_URL`, `BETTER_AUTH_SECRET`, `ALLOWED_SIGN_IN`. Everything else has a
-localhost default or is genuinely optional.
+`DATABASE_URL`, `BETTER_AUTH_SECRET`. Everything else has a localhost default or is
+genuinely optional.
 
 **`GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`** are the sign-in button *and* the
 Gmail/Calendar sync — optional, so an SSO-only install needn't create a Google project,
 but **set together or not at all** (`packages/auth/src/env.ts` throws on one).
 
-**`ALLOWED_SIGN_IN`** — comma-separated whole domains or single addresses (bare
-addresses exist for a solo self-hoster, where `gmail.com` would be an open door). **One
-list, read by the sign-in guard *and* the sync's "which side is external" decision** —
-if they drifted a colleague would be refused at the door or filed as a lead. **An empty
-list fails closed.** Parsed on demand. `packages/auth/src/workspace.ts`.
+**Sign-up is open, and no variable narrows it.** Anyone who completes the Google (or
+SSO) flow gets an account and their own organization. Who may sign in is decided at the
+identity provider — the OAuth consent screen's publishing status and user type — not by
+this repo. **Which addresses count as internal is per-organization**, derived from that
+org's own member emails in `google-match.service.ts`; there is no global list, because a
+global one would make org A's domain read as internal inside org B.
 
 ## Where things are
 
@@ -127,9 +128,9 @@ imports nothing; Calendar reads from `now`.
 need a Pro plan; on Hobby it silently becomes daily.
 
 Deliberate absences: **no `GOOGLE_SYNC_ENABLED`** (a switch that can disable a mandatory
-feature is only ever wrong), **no `GOOGLE_WORKSPACE_DOMAIN`** (`ALLOWED_SIGN_IN` already
-says who is internal — two sources is how a colleague becomes a lead), **no
-`GMAIL_BACKFILL_DAYS`**, **no rate provider variable**.
+feature is only ever wrong), **no `GOOGLE_WORKSPACE_DOMAIN`** (an organization's own
+member emails already say who is internal — two sources is how a colleague becomes a
+lead), **no `GMAIL_BACKFILL_DAYS`**, **no rate provider variable**.
 
 ## WhatsApp
 
