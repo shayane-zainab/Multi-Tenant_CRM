@@ -437,7 +437,9 @@ export class CompaniesService {
 			throw this.translate(error, id);
 		}
 
-		await this.stamp.recomputeAfterDelete(deleted.targets, { companyId: id });
+		await this.stamp.recomputeAfterDelete(organizationId, deleted.targets, {
+			companyId: id,
+		});
 
 		this.logger.log({
 			message: "Company deleted",

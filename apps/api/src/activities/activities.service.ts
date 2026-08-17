@@ -144,7 +144,7 @@ export class ActivitiesService {
 		input: ActivityCreateInput,
 		actingUserId: string,
 	) {
-		const companyId = await this.resolveCompanyId(input);
+		const companyId = await this.resolveCompanyId(organizationId, input);
 
 		const isTask = input.type === ActivityType.TASK;
 
@@ -165,6 +165,7 @@ export class ActivitiesService {
 		});
 
 		await this.stamp.touch(
+			organizationId,
 			{ companyId, contactId: input.contactId, dealId: input.dealId },
 			activity.createdAt,
 		);
@@ -243,31 +244,45 @@ export class ActivitiesService {
 	}
 
 	private async resolveCompanyId(
+		organizationId: string,
 		input: ActivityCreateInput,
 	): Promise<string | null> {
+		const [company, contact, deal] = await Promise.all([
+			input.companyId
+				? this.db.company.findFirst({
+						where: { id: input.companyId, organizationId },
+						select: { id: true },
+					})
+				: null,
+			input.contactId
+				? this.db.contact.findFirst({
+						where: { id: input.contactId, organizationId },
+						select: { companyId: true },
+					})
+				: null,
+			input.dealId
+				? this.db.deal.findFirst({
+						where: { id: input.dealId, organizationId },
+						select: { companyId: true },
+					})
+				: null,
+		]);
+
+		if (input.companyId && !company) {
+			throw new NotFoundException(`No company with id ${input.companyId}.`);
+		}
+
+		if (input.contactId && !contact) {
+			throw new NotFoundException(`No contact with id ${input.contactId}.`);
+		}
+
+		if (input.dealId && !deal) {
+			throw new NotFoundException(`No deal with id ${input.dealId}.`);
+		}
+
 		if (input.companyId) return input.companyId;
-
-		if (input.dealId) {
-			const deal = await this.db.deal.findUnique({
-				where: { id: input.dealId },
-				select: { companyId: true },
-			});
-			if (!deal) {
-				throw new NotFoundException(`No deal with id ${input.dealId}.`);
-			}
-			return deal.companyId;
-		}
-
-		if (input.contactId) {
-			const contact = await this.db.contact.findUnique({
-				where: { id: input.contactId },
-				select: { companyId: true },
-			});
-			if (!contact) {
-				throw new NotFoundException(`No contact with id ${input.contactId}.`);
-			}
-			return contact.companyId;
-		}
+		if (deal) return deal.companyId;
+		if (contact) return contact.companyId;
 
 		return null;
 	}

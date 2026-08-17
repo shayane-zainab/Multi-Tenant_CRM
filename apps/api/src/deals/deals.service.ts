@@ -362,7 +362,9 @@ export class DealsService {
 			throw this.translate(error, id);
 		}
 
-		await this.stamp.recomputeAfterDelete(deleted.targets, { dealId: id });
+		await this.stamp.recomputeAfterDelete(organizationId, deleted.targets, {
+			dealId: id,
+		});
 
 		this.logger.log({
 			message: "Deal deleted",
@@ -429,6 +431,7 @@ export class DealsService {
 		]);
 
 		await this.stamp.touch(
+			organizationId,
 			{ companyId: deal.companyId, dealId: deal.id },
 			new Date(),
 		);

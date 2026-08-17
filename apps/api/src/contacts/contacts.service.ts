@@ -412,7 +412,9 @@ export class ContactsService {
 			throw this.translate(error, id);
 		}
 
-		await this.stamp.recomputeAfterDelete(deleted.targets, { contactId: id });
+		await this.stamp.recomputeAfterDelete(organizationId, deleted.targets, {
+			contactId: id,
+		});
 
 		this.logger.log({
 			message: "Contact deleted",

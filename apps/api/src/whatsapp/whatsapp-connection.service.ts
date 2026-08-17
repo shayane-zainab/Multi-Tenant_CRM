@@ -193,7 +193,7 @@ export class WhatsAppConnectionService {
 		});
 
 		for (const thread of threads) {
-			await this.stamp.recompute({
+			await this.stamp.recompute(organizationId, {
 				contactId: thread.contactId,
 				companyId: thread.companyId,
 			});
@@ -335,7 +335,7 @@ export class WhatsAppConnectionService {
 			throw new BadRequestException(result.message);
 		}
 
-		await this.sync.recordOutbound({
+		await this.sync.recordOutbound(organizationId, {
 			threadId: thread.id,
 			waMessageId: result.waMessageId,
 			body: input.body,

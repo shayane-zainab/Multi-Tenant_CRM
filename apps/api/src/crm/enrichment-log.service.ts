@@ -41,6 +41,7 @@ export class EnrichmentLogService {
 		});
 
 		await this.stamp.touch(
+			organizationId,
 			{ companyId: event.companyId, contactId: event.contactId },
 			activity.createdAt,
 		);

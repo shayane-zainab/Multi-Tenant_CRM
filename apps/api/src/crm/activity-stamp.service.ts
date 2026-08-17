@@ -24,8 +24,13 @@ export class ActivityStampService {
 
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async touch(target: ActivityTarget, at: Date): Promise<void> {
+	async touch(
+		organizationId: string,
+		target: ActivityTarget,
+		at: Date,
+	): Promise<void> {
 		const stale = {
+			organizationId,
 			OR: [{ lastActivityAt: null }, { lastActivityAt: { lt: at } }],
 		};
 
@@ -51,36 +56,39 @@ export class ActivityStampService {
 		]);
 	}
 
-	async recompute(target: ActivityTarget): Promise<void> {
+	async recompute(
+		organizationId: string,
+		target: ActivityTarget,
+	): Promise<void> {
 		if (target.companyId) {
 			const { _max } = await this.db.activity.aggregate({
-				where: { companyId: target.companyId },
+				where: { organizationId, companyId: target.companyId },
 				_max: { createdAt: true },
 			});
-			await this.db.company.update({
-				where: { id: target.companyId },
+			await this.db.company.updateMany({
+				where: { id: target.companyId, organizationId },
 				data: { lastActivityAt: _max.createdAt },
 			});
 		}
 
 		if (target.contactId) {
 			const { _max } = await this.db.activity.aggregate({
-				where: { contactId: target.contactId },
+				where: { organizationId, contactId: target.contactId },
 				_max: { createdAt: true },
 			});
-			await this.db.contact.update({
-				where: { id: target.contactId },
+			await this.db.contact.updateMany({
+				where: { id: target.contactId, organizationId },
 				data: { lastActivityAt: _max.createdAt },
 			});
 		}
 
 		if (target.dealId) {
 			const { _max } = await this.db.activity.aggregate({
-				where: { dealId: target.dealId },
+				where: { organizationId, dealId: target.dealId },
 				_max: { createdAt: true },
 			});
-			await this.db.deal.update({
-				where: { id: target.dealId },
+			await this.db.deal.updateMany({
+				where: { id: target.dealId, organizationId },
 				data: { lastActivityAt: _max.createdAt },
 			});
 		}
@@ -103,11 +111,14 @@ export class ActivityStampService {
 		};
 	}
 
-	async recomputeMany(targets: StampTargets): Promise<void> {
+	async recomputeMany(
+		organizationId: string,
+		targets: StampTargets,
+	): Promise<void> {
 		const statements = [
-			this.restamp("company", "companyId", targets.companyIds),
-			this.restamp("contact", "contactId", targets.contactIds),
-			this.restamp("deal", "dealId", targets.dealIds),
+			this.restamp(organizationId, "company", "companyId", targets.companyIds),
+			this.restamp(organizationId, "contact", "contactId", targets.contactIds),
+			this.restamp(organizationId, "deal", "dealId", targets.dealIds),
 		].filter((statement) => statement !== null);
 
 		if (statements.length === 0) return;
@@ -116,11 +127,12 @@ export class ActivityStampService {
 	}
 
 	async recomputeAfterDelete(
+		organizationId: string,
 		targets: StampTargets,
 		deleted: ActivityTarget,
 	): Promise<void> {
 		try {
-			await this.recomputeMany(targets);
+			await this.recomputeMany(organizationId, targets);
 		} catch (error) {
 			this.logger.error(
 				{
@@ -133,7 +145,12 @@ export class ActivityStampService {
 		}
 	}
 
-	private restamp(table: string, column: string, ids: string[]) {
+	private restamp(
+		organizationId: string,
+		table: string,
+		column: string,
+		ids: string[],
+	) {
 		if (ids.length === 0) return null;
 
 		const record = PrismaNamespace.raw(`"${table}"`);
@@ -142,9 +159,11 @@ export class ActivityStampService {
 		return this.db.$executeRaw`
 			UPDATE ${record} r
 			SET "lastActivityAt" = (
-				SELECT MAX(a."createdAt") FROM "activity" a WHERE a.${key} = r.id
+				SELECT MAX(a."createdAt") FROM "activity" a
+				WHERE a.${key} = r.id AND a."organizationId" = r."organizationId"
 			)
-			WHERE r.id IN (${PrismaNamespace.join(ids)})`;
+			WHERE r.id IN (${PrismaNamespace.join(ids)})
+			AND r."organizationId" = ${organizationId}`;
 	}
 
 	async recomputeAll(): Promise<void> {

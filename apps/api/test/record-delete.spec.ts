@@ -325,6 +325,7 @@ describe("the activity stamps a delete leaves behind", () => {
 			},
 		});
 		await stamp.touch(
+			orgId,
 			{ companyId: company.id, contactId: contact.id, dealId: deal.id },
 			at,
 		);
@@ -377,7 +378,7 @@ describe("the activity stamps a delete leaves behind", () => {
 				createdAt: at,
 			},
 		});
-		await stamp.touch({ contactId: contact.id, dealId: deal.id }, at);
+		await stamp.touch(orgId, { contactId: contact.id, dealId: deal.id }, at);
 
 		await companies.delete(orgId, company.id);
 

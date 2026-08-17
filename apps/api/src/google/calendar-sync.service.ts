@@ -410,6 +410,7 @@ export class CalendarSyncService {
 		});
 
 		await this.stamp.touch(
+			organizationId,
 			{ companyId: summary.companyId, contactId: summary.contactId },
 			activity.createdAt,
 		);

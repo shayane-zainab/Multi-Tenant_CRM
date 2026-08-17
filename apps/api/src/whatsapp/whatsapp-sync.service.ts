@@ -228,6 +228,7 @@ export class WhatsAppSyncService {
 		});
 
 		await this.stamp.touch(
+			organizationId,
 			{ companyId: summary.companyId, contactId: summary.contactId },
 			activity.createdAt,
 		);
@@ -254,13 +255,16 @@ export class WhatsAppSyncService {
 		});
 	}
 
-	async recordOutbound(input: {
-		threadId: string;
-		waMessageId: string;
-		body: string;
-		fromWaId: string;
-		userId: string;
-	}): Promise<void> {
+	async recordOutbound(
+		organizationId: string,
+		input: {
+			threadId: string;
+			waMessageId: string;
+			body: string;
+			fromWaId: string;
+			userId: string;
+		},
+	): Promise<void> {
 		const now = new Date();
 
 		await this.db.whatsAppMessage.create({
@@ -293,6 +297,7 @@ export class WhatsAppSyncService {
 		});
 
 		await this.stamp.touch(
+			organizationId,
 			{ companyId: thread.companyId, contactId: thread.contactId },
 			now,
 		);
