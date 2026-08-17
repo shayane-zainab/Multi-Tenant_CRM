@@ -2,7 +2,7 @@ import { ActivityType, db } from "@crm/db";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { extract } from "../lib/context-dev";
-import { spend } from "../lib/focus";
+import { currentFocus, spend } from "../lib/focus";
 
 const RESEARCH_SCHEMA = {
 	type: "object",
@@ -45,17 +45,21 @@ export default defineTool({
 		companyId: z.string(),
 	}),
 	async execute({ companyId }) {
-		const company = await db.company.findUnique({
-			where: { id: companyId },
-			select: {
-				id: true,
-				name: true,
-				domain: true,
-				website: true,
-				ownerId: true,
-				organizationId: true,
-			},
-		});
+		const { organizationId } = currentFocus();
+
+		const company = organizationId
+			? await db.company.findFirst({
+					where: { id: companyId, organizationId },
+					select: {
+						id: true,
+						name: true,
+						domain: true,
+						website: true,
+						ownerId: true,
+						organizationId: true,
+					},
+				})
+			: null;
 
 		if (!company)
 			return { written: false as const, reason: "No such company." };

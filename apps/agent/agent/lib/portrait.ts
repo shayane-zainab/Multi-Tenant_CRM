@@ -1,5 +1,6 @@
 import { db } from "@crm/db";
 import { blobEnabled, isMirrored, mirror } from "@crm/db/blob";
+import { currentFocus } from "./focus";
 import { findPortrait, type PortraitSource } from "./portrait-sources";
 
 export type PortraitResult = {
@@ -47,10 +48,14 @@ export async function storePortrait({
 		};
 	}
 
-	const contact = await db.contact.findUnique({
-		where: { id: contactId },
-		select: { imageUrl: true },
-	});
+	const { organizationId } = currentFocus();
+
+	const contact = organizationId
+		? await db.contact.findFirst({
+				where: { id: contactId, organizationId },
+				select: { imageUrl: true },
+			})
+		: null;
 
 	if (!contact) {
 		return { stored: false, imageUrl: null, reason: "No such contact." };

@@ -2,6 +2,7 @@ import { db } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { currentFocus } from "../lib/focus";
 import { scheduleTask } from "../lib/tasks";
 
 const MIN_DAYS = 1;
@@ -35,10 +36,14 @@ export default defineTool({
 			.describe("Vendor calls the next run may spend."),
 	}),
 	async execute({ contactId, days, reason, budget }) {
-		const contact = await db.contact.findUnique({
-			where: { id: contactId },
-			select: { organizationId: true },
-		});
+		const { organizationId } = currentFocus();
+
+		const contact = organizationId
+			? await db.contact.findFirst({
+					where: { id: contactId, organizationId },
+					select: { organizationId: true },
+				})
+			: null;
 
 		if (!contact) {
 			return { scheduled: false as const, reason: "No such contact." };

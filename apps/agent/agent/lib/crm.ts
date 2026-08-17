@@ -66,8 +66,11 @@ export async function contactsNeedingWork(limit: number): Promise<WorkItem[]> {
 export async function personForVerification(
 	contactId: string,
 ): Promise<Person | null> {
-	const contact = await db.contact.findUnique({
-		where: { id: contactId },
+	const { organizationId } = currentFocus();
+	if (!organizationId) return null;
+
+	const contact = await db.contact.findFirst({
+		where: { id: contactId, organizationId },
 		select: {
 			firstName: true,
 			lastName: true,
@@ -94,8 +97,11 @@ export async function personForVerification(
 export async function contactProfileSlug(
 	contactId: string,
 ): Promise<{ slug: string; profileUrl: string } | null> {
-	const contact = await db.contact.findUnique({
-		where: { id: contactId },
+	const { organizationId } = currentFocus();
+	if (!organizationId) return null;
+
+	const contact = await db.contact.findFirst({
+		where: { id: contactId, organizationId },
 		select: { linkedinUrl: true },
 	});
 
@@ -177,8 +183,11 @@ export async function readCrmHistory(
 	contactId: string,
 	options: { threads?: number; messagesPerThread?: number } = {},
 ): Promise<CrmHistory | null> {
-	const contact = await db.contact.findUnique({
-		where: { id: contactId },
+	const { organizationId } = currentFocus();
+	if (!organizationId) return null;
+
+	const contact = await db.contact.findFirst({
+		where: { id: contactId, organizationId },
 		select: {
 			id: true,
 			firstName: true,

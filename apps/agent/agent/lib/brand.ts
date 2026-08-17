@@ -2,6 +2,7 @@ import { db, EnrichmentStatus } from "@crm/db";
 import { mirrorBrandImages } from "./brand-images";
 import { brandToUpdate, filledFields, stillFillable } from "./brand-mapping";
 import { brandByDomain, contextDevEnabled } from "./context-dev";
+import { currentFocus } from "./focus";
 
 export type BrandResult = {
 	enriched: boolean;
@@ -50,10 +51,14 @@ export async function runBrand({
 	fresh?: boolean;
 	spend?: Spend;
 }): Promise<BrandResult> {
-	const company = await db.company.findUnique({
-		where: { id: companyId },
-		select: COMPANY_FIELDS,
-	});
+	const { organizationId } = currentFocus();
+
+	const company = organizationId
+		? await db.company.findFirst({
+				where: { id: companyId, organizationId },
+				select: COMPANY_FIELDS,
+			})
+		: null;
 
 	if (!company) return { enriched: false, reason: "No such company." };
 

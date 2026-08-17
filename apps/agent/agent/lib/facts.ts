@@ -65,8 +65,18 @@ export async function recordFact(
 		};
 	}
 
-	const contact = await db.contact.findUnique({
-		where: { id: contactId },
+	const { organizationId } = currentFocus();
+	if (!organizationId) {
+		return {
+			...base,
+			stored: false,
+			applied: false,
+			reason: "No such contact.",
+		};
+	}
+
+	const contact = await db.contact.findFirst({
+		where: { id: contactId, organizationId },
 		select: {
 			id: true,
 			email: true,

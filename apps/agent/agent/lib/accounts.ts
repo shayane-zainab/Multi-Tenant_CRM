@@ -1,4 +1,5 @@
 import { ActivityType, db, EmailDirection } from "@crm/db";
+import { currentFocus } from "./focus";
 import { isDerivedName } from "./names";
 
 const BODY_LIMIT = 4000;
@@ -92,8 +93,11 @@ export async function readCompanyHistory(
 		people?: number;
 	} = {},
 ): Promise<CompanyHistory | null> {
-	const company = await db.company.findUnique({
-		where: { id: companyId },
+	const { organizationId } = currentFocus();
+	if (!organizationId) return null;
+
+	const company = await db.company.findFirst({
+		where: { id: companyId, organizationId },
 		select: {
 			id: true,
 			name: true,
@@ -309,8 +313,11 @@ export async function readDealHistory(
 	dealId: string,
 	options: { threads?: number; messagesPerThread?: number } = {},
 ): Promise<DealHistory | null> {
-	const deal = await db.deal.findUnique({
-		where: { id: dealId },
+	const { organizationId } = currentFocus();
+	if (!organizationId) return null;
+
+	const deal = await db.deal.findFirst({
+		where: { id: dealId, organizationId },
 		select: {
 			id: true,
 			name: true,
