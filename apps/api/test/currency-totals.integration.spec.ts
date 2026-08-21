@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DealStage, db, RateSource } from "@crm/db";
+import { DealStage, db, RateSource, StageKind } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
 import { writeReportingCurrency } from "@crm/db/settings";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
@@ -231,6 +231,7 @@ describe("the deals list", () => {
 			status: "open",
 			owner: userId,
 			stage: "all",
+			pipeline: "all",
 			closing: "all",
 		});
 
@@ -449,6 +450,35 @@ describe("the dashboard only values what it can convert", () => {
 		await db.user.deleteMany({ where: { id: analystId } });
 	});
 
+	async function stageIdFor(kind: StageKind): Promise<string> {
+		const existing = await db.pipelineStage.findFirst({
+			where: { kind, pipeline: { organizationId: orgId } },
+			select: { id: true },
+		});
+
+		if (existing) return existing.id;
+
+		const created = await db.pipeline.create({
+			data: {
+				organizationId: orgId,
+				name: `Test pipeline ${suffix}`,
+				isDefault: true,
+				stages: {
+					create: [
+						{ name: "Open", kind: StageKind.OPEN, position: 0 },
+						{ name: "Won", kind: StageKind.WON, position: 1 },
+						{ name: "Lost", kind: StageKind.LOST, position: 2 },
+					],
+				},
+			},
+			select: { stages: { where: { kind }, select: { id: true }, take: 1 } },
+		});
+
+		const stage = created.stages[0];
+		if (!stage) throw new Error(`no ${kind} stage`);
+		return stage.id;
+	}
+
 	async function stale(name: string, stage: DealStage) {
 		const closed = stage === DealStage.CLOSED_WON;
 
@@ -478,7 +508,7 @@ describe("the dashboard only values what it can convert", () => {
 			ownerId: analystId,
 			amountCents: 10_000,
 			currency: "USD",
-			stage: DealStage.CLOSED_WON,
+			stageId: await stageIdFor(StageKind.WON),
 		});
 
 		const unvalued = await stale("Stale win", DealStage.CLOSED_WON);

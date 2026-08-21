@@ -15,6 +15,7 @@ import {
 	dealIdInput,
 	dealListInput,
 	dealUpdateArgs,
+	moveDealsInput,
 	setStageInput,
 } from "./deals.contracts";
 import { DealsService } from "./deals.service";
@@ -64,5 +65,13 @@ export class DealsRouter {
 		@Input() input: z.infer<typeof setStageInput>,
 	) {
 		return this.deals.setStage(ctx.organizationId, input, ctx.user.id);
+	}
+
+	@Mutation({ input: moveDealsInput })
+	async move(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof moveDealsInput>,
+	) {
+		return this.deals.moveMany(ctx.organizationId, input, ctx.user.id);
 	}
 }

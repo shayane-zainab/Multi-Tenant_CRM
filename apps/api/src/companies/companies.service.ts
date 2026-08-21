@@ -21,7 +21,7 @@ import {
 import { blankToNull, toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
-import { OPEN_DEAL_STAGES } from "../deals/deal-stage";
+import { OPEN_DEALS } from "../deals/deal-stage";
 import {
 	countsByKey,
 	FACET_ALL,
@@ -129,7 +129,7 @@ export class CompaniesService {
 					_count: {
 						select: {
 							contacts: true,
-							deals: { where: { stage: { in: [...OPEN_DEAL_STAGES] } } },
+							deals: { where: OPEN_DEALS },
 						},
 					},
 					lastActivityAt: true,
@@ -233,6 +233,9 @@ export class CompaniesService {
 						id: true,
 						name: true,
 						stage: true,
+						stageId: true,
+						pipelineId: true,
+						pipelineStage: { select: { id: true, name: true, kind: true } },
 						amount: true,
 						currency: true,
 						baseAmount: true,

@@ -50,7 +50,15 @@ const COLUMNS: DataTableColumn<DealRow>[] = [
 		header: "Stage",
 		sortable: true,
 		width: "w-[18%]",
-		cell: (row) => <DealStageMenu dealId={row.id} stage={row.stage} />,
+		cell: (row) => (
+			<DealStageMenu
+				dealId={row.id}
+				pipelineId={row.pipelineId}
+				stageId={row.stageId}
+				stageName={row.pipelineStage?.name ?? null}
+				stageKind={row.pipelineStage?.kind ?? null}
+			/>
+		),
 	},
 	{
 		id: "amount",

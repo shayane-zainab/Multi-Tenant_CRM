@@ -651,7 +651,13 @@ function CompanyDeals({
 							{deal.name}
 						</TableCell>
 						<TableCell className="px-3 py-2.5">
-							<DealStageMenu dealId={deal.id} stage={deal.stage} />
+							<DealStageMenu
+								dealId={deal.id}
+								pipelineId={deal.pipelineId}
+								stageId={deal.stageId}
+								stageName={deal.pipelineStage?.name ?? null}
+								stageKind={deal.pipelineStage?.kind ?? null}
+							/>
 						</TableCell>
 						<TableCell className="px-3 py-2.5 text-right">
 							<DealAmount

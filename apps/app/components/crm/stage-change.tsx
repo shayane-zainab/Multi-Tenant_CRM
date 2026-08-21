@@ -1,7 +1,6 @@
 "use client";
 
 import ChevronDown from "@carbon/icons-react/es/ChevronDown";
-import type { DealStage } from "@crm/db/enums";
 import { Button } from "@crm/ui/components/button";
 import {
 	Dialog,
@@ -14,25 +13,35 @@ import {
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@crm/ui/components/dropdown-menu";
 import { Field, FieldLabel } from "@crm/ui/components/field";
 import { Icon } from "@crm/ui/components/icon";
 import { Spinner } from "@crm/ui/components/spinner";
+import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { Textarea } from "@crm/ui/components/textarea";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
-import {
-	DEAL_STAGE_OPTIONS,
-	DealStageIndicator,
-	LOSING_STAGES,
-} from "./deal-stage";
+import type { RouterOutputs } from "@/lib/trpc/types";
+
+type Pipeline = RouterOutputs["pipelines"]["list"][number];
+type Stage = Pipeline["stages"][number];
+type Kind = Stage["kind"];
+
+const TONE: Record<Kind, "neutral" | "info" | "success" | "error"> = {
+	LEAD: "neutral",
+	OPEN: "info",
+	WON: "success",
+	LOST: "error",
+};
 
 const closeReasonParams = {
 	closing: parseAsString,
@@ -54,17 +63,62 @@ function useStageMutation(onDone?: () => void) {
 	);
 }
 
+export function StageLabel({
+	name,
+	kind,
+	className,
+}: {
+	name: string | null;
+	kind: Kind | null;
+	className?: string;
+}) {
+	if (!name || !kind) {
+		return <span className={className}>No stage</span>;
+	}
+
+	return (
+		<StatusIndicator tone={TONE[kind]} label={name} className={className} />
+	);
+}
+
 export function DealStageMenu({
 	dealId,
-	stage,
+	pipelineId,
+	stageId,
+	stageName,
+	stageKind,
 	variant = "inline",
 }: {
 	dealId: string;
-	stage: DealStage;
+	pipelineId: string | null;
+	stageId: string | null;
+	stageName: string | null;
+	stageKind: Kind | null;
 	variant?: "inline" | "control";
 }) {
+	const trpc = useTRPC();
 	const [, setCloseParams] = useQueryStates(closeReasonParams);
 	const setStage = useStageMutation();
+
+	const pipelines = useQuery(trpc.pipelines.list.queryOptions());
+
+	const current =
+		pipelines.data?.find((row) => row.id === pipelineId) ??
+		pipelines.data?.find((row) => row.isDefault) ??
+		pipelines.data?.[0];
+
+	const others = pipelines.data?.filter((row) => row.id !== current?.id) ?? [];
+
+	const choose = (stage: Stage) => {
+		if (stage.id === stageId) return;
+
+		if (stage.kind === "LOST") {
+			void setCloseParams({ closing: dealId, closingStage: stage.id });
+			return;
+		}
+
+		setStage.mutate({ id: dealId, stageId: stage.id });
+	};
 
 	return (
 		<DropdownMenu>
@@ -76,7 +130,11 @@ export function DealStageMenu({
 						disabled={setStage.isPending}
 						onClick={(event) => event.stopPropagation()}
 					>
-						<DealStageIndicator stage={stage} className="text-foreground" />
+						<StageLabel
+							name={stageName}
+							kind={stageKind}
+							className="text-foreground"
+						/>
 						<Icon icon={ChevronDown} className="text-muted-foreground" />
 					</Button>
 				) : (
@@ -86,7 +144,7 @@ export function DealStageMenu({
 						disabled={setStage.isPending}
 						className="flex min-w-0 items-center text-left hover:text-foreground disabled:opacity-50"
 					>
-						<DealStageIndicator stage={stage} />
+						<StageLabel name={stageName} kind={stageKind} />
 					</button>
 				)}
 			</DropdownMenuTrigger>
@@ -95,27 +153,37 @@ export function DealStageMenu({
 				className="min-w-52"
 				onClick={(event) => event.stopPropagation()}
 			>
-				<DropdownMenuRadioGroup
-					value={stage}
-					onValueChange={(next) => {
-						const chosen = next as DealStage;
-						if (chosen === stage) return;
-						if (LOSING_STAGES.includes(chosen)) {
-							void setCloseParams({
-								closing: dealId,
-								closingStage: chosen,
-							});
-							return;
-						}
-						setStage.mutate({ id: dealId, stage: chosen });
-					}}
-				>
-					{DEAL_STAGE_OPTIONS.map((option) => (
-						<DropdownMenuRadioItem key={option.value} value={option.value}>
-							{option.label}
-						</DropdownMenuRadioItem>
-					))}
-				</DropdownMenuRadioGroup>
+				{current ? (
+					<DropdownMenuRadioGroup
+						value={stageId ?? ""}
+						onValueChange={(next) => {
+							const stage = current.stages.find((row) => row.id === next);
+							if (stage) choose(stage);
+						}}
+					>
+						{current.stages.map((stage) => (
+							<DropdownMenuRadioItem key={stage.id} value={stage.id}>
+								{stage.name}
+							</DropdownMenuRadioItem>
+						))}
+					</DropdownMenuRadioGroup>
+				) : null}
+
+				{others.map((pipeline) => (
+					<div key={pipeline.id}>
+						<DropdownMenuSeparator />
+						<DropdownMenuLabel>Move to {pipeline.name}</DropdownMenuLabel>
+						{pipeline.stages.map((stage) => (
+							<DropdownMenuRadioItem
+								key={stage.id}
+								value={stage.id}
+								onSelect={() => choose(stage)}
+							>
+								{stage.name}
+							</DropdownMenuRadioItem>
+						))}
+					</div>
+				))}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
@@ -123,34 +191,25 @@ export function DealStageMenu({
 
 export function CloseReasonDialog() {
 	const reasonId = useId();
+	const [reason, setReason] = useState("");
 	const [{ closing, closingStage }, setCloseParams] =
 		useQueryStates(closeReasonParams);
-	const [reason, setReason] = useState("");
 
 	const close = () => {
 		setReason("");
 		void setCloseParams({ closing: null, closingStage: null });
 	};
 
-	const setStage = useStageMutation(() => {
-		toast.success("Deal closed.");
-		close();
-	});
-
-	const stage = closingStage as DealStage | null;
-	const open = Boolean(closing && stage);
+	const setStage = useStageMutation(close);
+	const open = Boolean(closing && closingStage);
 
 	return (
 		<Dialog open={open} onOpenChange={(next) => !next && close()}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>
-						{stage === "CLOSED_LOST" ? "Close as lost" : "Mark as unqualified"}
-					</DialogTitle>
+					<DialogTitle>Why was it lost?</DialogTitle>
 					<DialogDescription>
-						{stage === "CLOSED_LOST"
-							? "What did we lose it to? This is the only place that answer gets recorded."
-							: "Why is this not a fit? It goes on the timeline so nobody re-runs the same deal."}
+						A closed-lost deal with no reason teaches nobody anything.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -159,8 +218,12 @@ export function CloseReasonDialog() {
 					className="px-4"
 					onSubmit={(event) => {
 						event.preventDefault();
-						if (!closing || !stage) return;
-						setStage.mutate({ id: closing, stage, closedReason: reason });
+						if (!closing || !closingStage) return;
+						setStage.mutate({
+							id: closing,
+							stageId: closingStage,
+							closedReason: reason,
+						});
 					}}
 				>
 					<Field>
@@ -169,23 +232,23 @@ export function CloseReasonDialog() {
 							id={reasonId}
 							value={reason}
 							onChange={(event) => setReason(event.target.value)}
-							placeholder="Went with an incumbent vendor"
-							rows={3}
+							placeholder="Went with a competitor on price."
+							required
 						/>
 					</Field>
 				</form>
 
 				<DialogFooter>
+					<Button variant="outline" onClick={close}>
+						Cancel
+					</Button>
 					<Button
 						type="submit"
 						form="close-reason"
-						disabled={setStage.isPending || reason.trim() === ""}
+						disabled={setStage.isPending || reason.trim().length === 0}
 					>
 						{setStage.isPending ? <Spinner /> : null}
-						Save
-					</Button>
-					<Button variant="outline" onClick={close}>
-						Cancel
+						Mark as lost
 					</Button>
 				</DialogFooter>
 			</DialogContent>

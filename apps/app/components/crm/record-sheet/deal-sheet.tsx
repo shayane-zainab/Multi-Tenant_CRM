@@ -170,7 +170,10 @@ export function DealSheet({ dealId }: { dealId: string }) {
 					<>
 						<DealStageMenu
 							dealId={deal.id}
-							stage={deal.stage}
+							pipelineId={deal.pipelineId}
+							stageId={deal.stageId}
+							stageName={deal.pipelineStage?.name ?? null}
+							stageKind={deal.pipelineStage?.kind ?? null}
 							variant="control"
 						/>
 						<RecordActions
@@ -240,7 +243,11 @@ function DealOverview({ deal }: { deal: Deal }) {
 	return (
 		<DetailSheetBody>
 			<DetailSheetSection title="Stage">
-				<StageStepper dealId={deal.id} stage={deal.stage} />
+				<StageStepper
+					dealId={deal.id}
+					pipelineId={deal.pipelineId}
+					stageId={deal.stageId}
+				/>
 			</DetailSheetSection>
 
 			<DetailSheetSection title="Details">

@@ -43,6 +43,14 @@ function changeDelta(
 	};
 }
 
+const STAGE_COLORS = [
+	"var(--chart-1)",
+	"var(--chart-2)",
+	"var(--chart-3)",
+	"var(--chart-4)",
+	"var(--chart-5)",
+] as const;
+
 export function SalesDashboard({ summary }: { summary: Summary }) {
 	const workspaceUrl = useWorkspaceUrl();
 
@@ -67,11 +75,11 @@ export function SalesDashboard({ summary }: { summary: Summary }) {
 	const hasTrend = trend.some((point) => point.won > 0 || point.created > 0);
 
 	const stageSlices = pipeline.stages
-		.map((stage) => ({
-			key: stage.stage,
-			label: dealStageLabel(stage.stage),
+		.map((stage, index) => ({
+			key: stage.stageId,
+			label: stage.stage,
 			value: stage.valueCents,
-			color: dealStageColor(stage.stage),
+			color: STAGE_COLORS[index % STAGE_COLORS.length] ?? STAGE_COLORS[0],
 			count: stage.count,
 		}))
 		.filter((slice) => slice.value > 0);

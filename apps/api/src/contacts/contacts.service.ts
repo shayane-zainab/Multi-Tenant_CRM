@@ -217,6 +217,11 @@ export class ContactsService {
 								id: true,
 								name: true,
 								stage: true,
+								stageId: true,
+								pipelineId: true,
+								pipelineStage: {
+									select: { id: true, name: true, kind: true },
+								},
 								amount: true,
 								currency: true,
 								expectedCloseDate: true,

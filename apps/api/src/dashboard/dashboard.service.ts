@@ -1,9 +1,9 @@
-import { ActivityType, type Db, DealStage } from "@crm/db";
+import { ActivityType, type Db, DealStage, StageKind } from "@crm/db";
 import { Injectable } from "@nestjs/common";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
-import { OPEN_DEAL_STAGES } from "../deals/deal-stage";
+import { OPEN_DEALS } from "../deals/deal-stage";
 import type { DashboardSummaryInput } from "./dashboard.contracts";
 
 const OWNER_SELECT = {
@@ -67,14 +67,14 @@ export class DashboardService {
 			unconverted,
 		] = await Promise.all([
 			this.db.deal.groupBy({
-				by: ["stage"],
-				where: { ...owned, stage: { in: [...OPEN_DEAL_STAGES] } },
+				by: ["stageId"],
+				where: { ...owned, ...OPEN_DEALS },
 				_count: { _all: true },
 			}),
 			this.db.deal.groupBy({
-				by: ["stage"],
+				by: ["stageId"],
 				where: {
-					AND: [{ ...owned, stage: { in: [...OPEN_DEAL_STAGES] } }, counted],
+					AND: [{ ...owned, ...OPEN_DEALS }, counted],
 				},
 				_sum: { baseAmount: true },
 			}),
@@ -99,7 +99,7 @@ export class DashboardService {
 					AND: [
 						{
 							...owned,
-							stage: { in: [...OPEN_DEAL_STAGES] },
+							...OPEN_DEALS,
 							expectedCloseDate: { gte: startOfMonth, lt: startOfNextMonth },
 						},
 						counted,
@@ -109,7 +109,7 @@ export class DashboardService {
 				_sum: { baseAmount: true },
 			}),
 			this.db.deal.findMany({
-				where: { ...owned, stage: { in: [...OPEN_DEAL_STAGES] } },
+				where: { ...owned, ...OPEN_DEALS },
 				orderBy: [
 					{ baseAmount: { sort: "desc", nulls: "last" } },
 					{ expectedCloseDate: "asc" },
@@ -176,11 +176,31 @@ export class DashboardService {
 			this.conversion.unconverted(organizationId, owned),
 		]);
 
-		const stages = OPEN_DEAL_STAGES.map((stage) => {
-			const group = openByStage.find((row) => row.stage === stage);
-			const value = openValueByStage.find((row) => row.stage === stage);
+		const openStages = await this.db.pipelineStage.findMany({
+			where: {
+				kind: StageKind.OPEN,
+				pipeline: { organizationId, archivedAt: null },
+			},
+			orderBy: [
+				{ pipeline: { position: "asc" } },
+				{ position: "asc" },
+				{ createdAt: "asc" },
+			],
+			select: {
+				id: true,
+				name: true,
+				pipeline: { select: { id: true, name: true } },
+			},
+		});
+
+		const stages = openStages.map((stage) => {
+			const group = openByStage.find((row) => row.stageId === stage.id);
+			const value = openValueByStage.find((row) => row.stageId === stage.id);
 			return {
-				stage: stage as DealStage,
+				stageId: stage.id,
+				stage: stage.name,
+				pipelineId: stage.pipeline.id,
+				pipeline: stage.pipeline.name,
 				count: group?._count._all ?? 0,
 				valueCents: toCents(value?._sum.baseAmount ?? null) ?? 0,
 			};
@@ -247,8 +267,8 @@ export class DashboardService {
 			unconverted,
 			pipeline: {
 				stages,
-				totalCents: stages.reduce((total, s) => total + s.valueCents, 0),
-				totalDeals: stages.reduce((total, s) => total + s.count, 0),
+				totalCents: stages.reduce((total, row) => total + row.valueCents, 0),
+				totalDeals: stages.reduce((total, row) => total + row.count, 0),
 			},
 			wonThisMonth,
 			wonPrevMonth,

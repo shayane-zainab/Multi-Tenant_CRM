@@ -130,7 +130,6 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 							name,
 							companyId: company,
 							ownerId: resolvedOwner,
-							stage: stage as never,
 							amountCents: Number.isFinite(parsed)
 								? Math.round(parsed * 100)
 								: null,
