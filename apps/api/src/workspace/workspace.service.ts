@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import {
 	canChangeRole,
+	canInviteMembers,
 	canRenameWorkspace,
 	isWorkspaceRole,
 	type WorkspaceRole,
@@ -8,6 +10,7 @@ import type { Db, Prisma } from "@crm/db";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Injectable,
 	Logger,
@@ -25,7 +28,9 @@ import {
 	resolveOrderBy,
 } from "../trpc/list-input";
 import type {
+	InviteMemberInput,
 	MemberListInput,
+	RevokeInvitationInput,
 	SetMemberRoleInput,
 	UpdateWorkspaceInput,
 } from "./workspace.contracts";
@@ -41,6 +46,15 @@ export interface Workspace {
 	canChangeRoles: boolean;
 }
 
+export interface WorkspaceInvitation {
+	id: string;
+	email: string;
+	role: WorkspaceRole;
+	invitedBy: string | null;
+	createdAt: string;
+	expiresAt: string;
+}
+
 export interface WorkspaceMember {
 	id: string;
 	userId: string;
@@ -51,6 +65,8 @@ export interface WorkspaceMember {
 	joinedAt: string;
 	isViewer: boolean;
 }
+
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const MEMBER_SELECT = {
 	id: true,
@@ -243,6 +259,155 @@ export class WorkspaceService {
 		});
 
 		return this.toMember(updated, userId);
+	}
+
+	async invitations(
+		organizationId: string,
+		userId: string,
+	): Promise<WorkspaceInvitation[]> {
+		const role = await this.roleOf(organizationId, userId);
+
+		if (!canInviteMembers(role)) {
+			throw new ForbiddenException(
+				"Only an owner or an admin can see pending invitations.",
+			);
+		}
+
+		const rows = await this.db.invitation.findMany({
+			where: {
+				organizationId,
+				status: "pending",
+				expiresAt: { gt: new Date() },
+			},
+			orderBy: { createdAt: "desc" },
+			select: {
+				id: true,
+				email: true,
+				role: true,
+				createdAt: true,
+				expiresAt: true,
+				user: { select: { name: true, email: true } },
+			},
+		});
+
+		return rows.map((row) => ({
+			id: row.id,
+			email: row.email,
+			role: toRole(row.role ?? "member") ?? "member",
+			invitedBy: row.user?.name ?? row.user?.email ?? null,
+			createdAt: row.createdAt.toISOString(),
+			expiresAt: row.expiresAt.toISOString(),
+		}));
+	}
+
+	async invite(
+		organizationId: string,
+		userId: string,
+		input: InviteMemberInput,
+	): Promise<WorkspaceInvitation> {
+		const role = await this.roleOf(organizationId, userId);
+
+		if (!canInviteMembers(role)) {
+			throw new ForbiddenException(
+				"Only an owner or an admin can invite people.",
+			);
+		}
+
+		const email = input.email.trim().toLowerCase();
+
+		const alreadyHere = await this.db.member.findFirst({
+			where: {
+				organizationId,
+				user: { email: { equals: email, mode: "insensitive" } },
+			},
+			select: { id: true },
+		});
+
+		if (alreadyHere) {
+			throw new ConflictException(`${email} is already in this workspace.`);
+		}
+
+		const pending = await this.db.invitation.findFirst({
+			where: {
+				organizationId,
+				email: { equals: email, mode: "insensitive" },
+				status: "pending",
+				expiresAt: { gt: new Date() },
+			},
+			select: { id: true },
+		});
+
+		if (pending) {
+			throw new ConflictException(`${email} has already been invited.`);
+		}
+
+		const created = await this.db.invitation.create({
+			data: {
+				id: randomUUID(),
+				organizationId,
+				email,
+				role: input.role,
+				status: "pending",
+				inviterId: userId,
+				expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+			},
+			select: {
+				id: true,
+				email: true,
+				role: true,
+				createdAt: true,
+				expiresAt: true,
+				user: { select: { name: true, email: true } },
+			},
+		});
+
+		this.logger.log({
+			message: "Workspace invitation created",
+			organizationId,
+			userId,
+			invitationId: created.id,
+			role: input.role,
+		});
+
+		return {
+			id: created.id,
+			email: created.email,
+			role: toRole(created.role ?? "member") ?? "member",
+			invitedBy: created.user?.name ?? created.user?.email ?? null,
+			createdAt: created.createdAt.toISOString(),
+			expiresAt: created.expiresAt.toISOString(),
+		};
+	}
+
+	async revokeInvitation(
+		organizationId: string,
+		userId: string,
+		input: RevokeInvitationInput,
+	): Promise<{ id: string }> {
+		const role = await this.roleOf(organizationId, userId);
+
+		if (!canInviteMembers(role)) {
+			throw new ForbiddenException(
+				"Only an owner or an admin can revoke an invitation.",
+			);
+		}
+
+		const removed = await this.db.invitation.deleteMany({
+			where: { id: input.invitationId, organizationId, status: "pending" },
+		});
+
+		if (removed.count === 0) {
+			throw new NotFoundException("That invitation no longer exists.");
+		}
+
+		this.logger.log({
+			message: "Workspace invitation revoked",
+			organizationId,
+			userId,
+			invitationId: input.invitationId,
+		});
+
+		return { id: input.invitationId };
 	}
 
 	private toMember(row: MemberRow, userId: string): WorkspaceMember {

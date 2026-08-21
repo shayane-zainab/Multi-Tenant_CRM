@@ -24,7 +24,7 @@ import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInpu
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
 import { connectInput, connectionInput, setWhatsAppAutoCreateInput, threadsInput, whatsAppThreadInput, sendInput } from "../whatsapp/whatsapp.contracts";
-import { memberListInput, updateWorkspaceInput, setMemberRoleInput } from "../workspace/workspace.contracts";
+import { memberListInput, updateWorkspaceInput, setMemberRoleInput, inviteMemberInput, revokeInvitationInput } from "../workspace/workspace.contracts";
 import type { ActivitiesRouter } from "../activities/activities.router";
 import type { CompaniesRouter } from "../companies/companies.router";
 import type { ContactsRouter } from "../contacts/contacts.router";
@@ -261,7 +261,15 @@ const appRouter = t.router({
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["update"]>>),
     setMemberRole: publicProcedure
       .input(setMemberRoleInput)
-      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["setMemberRole"]>>)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["setMemberRole"]>>),
+    invitations: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["invitations"]>>),
+    invite: publicProcedure
+      .input(inviteMemberInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["invite"]>>),
+    revokeInvitation: publicProcedure
+      .input(revokeInvitationInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["revokeInvitation"]>>)
     })
 });
 

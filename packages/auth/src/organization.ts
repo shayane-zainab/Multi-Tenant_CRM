@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { db } from "@crm/db";
 import { workspaceSlug } from "@crm/db/workspace";
 
@@ -32,6 +32,10 @@ export function canManageWhatsApp(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export function canInviteMembers(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
+
 async function findMembership(userId: string): Promise<string | undefined> {
 	const membership = await db.member.findFirst({
 		where: { userId },
@@ -42,11 +46,59 @@ async function findMembership(userId: string): Promise<string | undefined> {
 	return membership?.organizationId;
 }
 
+async function claimInvitation(userId: string): Promise<string | undefined> {
+	const user = await db.user.findUnique({
+		where: { id: userId },
+		select: { email: true },
+	});
+
+	if (!user?.email) return undefined;
+
+	const invitation = await db.invitation.findFirst({
+		where: {
+			email: { equals: user.email, mode: "insensitive" },
+			status: "pending",
+			expiresAt: { gt: new Date() },
+		},
+		orderBy: { createdAt: "asc" },
+		select: { id: true, organizationId: true, role: true },
+	});
+
+	if (!invitation) return undefined;
+
+	try {
+		await db.$transaction([
+			db.member.create({
+				data: {
+					id: randomUUID(),
+					organizationId: invitation.organizationId,
+					userId,
+					role: isWorkspaceRole(invitation.role ?? "")
+						? (invitation.role as string)
+						: "member",
+					createdAt: new Date(),
+				},
+			}),
+			db.invitation.update({
+				where: { id: invitation.id },
+				data: { status: "accepted" },
+			}),
+		]);
+
+		return invitation.organizationId;
+	} catch {
+		return await findMembership(userId);
+	}
+}
+
 export async function ensureOrganizationMembership(
 	userId: string,
 ): Promise<string | undefined> {
 	const existing = await findMembership(userId);
 	if (existing) return existing;
+
+	const invited = await claimInvitation(userId);
+	if (invited) return invited;
 
 	const base = workspaceSlug(DEFAULT_WORKSPACE_NAME);
 

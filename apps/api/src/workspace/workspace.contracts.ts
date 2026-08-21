@@ -20,3 +20,15 @@ export const setMemberRoleInput = z.object({
 
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInput>;
 export type SetMemberRoleInput = z.infer<typeof setMemberRoleInput>;
+
+export const inviteMemberInput = z.object({
+	email: z.string().trim().toLowerCase().email().max(255),
+	role: z.enum(WORKSPACE_ROLES).default("member"),
+});
+
+export const revokeInvitationInput = z.object({
+	invitationId: z.string().min(1),
+});
+
+export type InviteMemberInput = z.infer<typeof inviteMemberInput>;
+export type RevokeInvitationInput = z.infer<typeof revokeInvitationInput>;
