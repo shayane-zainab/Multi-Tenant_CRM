@@ -21,6 +21,7 @@ import { setReportingCurrencyInput, setManualRateInput, removeManualRateInput } 
 import { dashboardSummaryInput } from "../dashboard/dashboard.contracts";
 import { dealListInput, dealIdInput, dealCreateInput, dealUpdateArgs, setStageInput } from "../deals/deals.contracts";
 import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInput } from "../google/google.contracts";
+import { createPipelineInput, renamePipelineInput, pipelineIdInput, addStageInput, updateStageInput, reorderStagesInput, removeStageInput } from "../pipelines/pipelines.contracts";
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
 import { connectInput, connectionInput, setWhatsAppAutoCreateInput, threadsInput, whatsAppThreadInput, sendInput } from "../whatsapp/whatsapp.contracts";
@@ -33,6 +34,7 @@ import type { CurrencyRouter } from "../currency/currency.router";
 import type { DashboardRouter } from "../dashboard/dashboard.router";
 import type { DealsRouter } from "../deals/deals.router";
 import type { GoogleRouter } from "../google/google.router";
+import type { PipelinesRouter } from "../pipelines/pipelines.router";
 import type { SearchRouter } from "../search/search.router";
 import type { SettingsRouter } from "../settings/settings.router";
 import type { SsoRouter } from "../sso/sso.router";
@@ -185,6 +187,34 @@ const appRouter = t.router({
     event: publicProcedure
       .input(calendarEventInput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<GoogleRouter["event"]>>)
+    }),
+  pipelines: t.router({
+    list: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["list"]>>),
+    create: publicProcedure
+      .input(createPipelineInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["create"]>>),
+    rename: publicProcedure
+      .input(renamePipelineInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["rename"]>>),
+    archive: publicProcedure
+      .input(pipelineIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["archive"]>>),
+    makeDefault: publicProcedure
+      .input(pipelineIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["makeDefault"]>>),
+    addStage: publicProcedure
+      .input(addStageInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["addStage"]>>),
+    updateStage: publicProcedure
+      .input(updateStageInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["updateStage"]>>),
+    reorderStages: publicProcedure
+      .input(reorderStagesInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["reorderStages"]>>),
+    removeStage: publicProcedure
+      .input(removeStageInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<PipelinesRouter["removeStage"]>>)
     }),
   search: t.router({
     quick: publicProcedure
