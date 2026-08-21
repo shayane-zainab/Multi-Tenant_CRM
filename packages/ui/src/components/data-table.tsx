@@ -20,6 +20,7 @@ import {
 } from "@crm/ui/components/dropdown-menu";
 import { Spinner } from "@crm/ui/components/spinner";
 import { TablePagination } from "@crm/ui/components/table-pagination";
+import { Checkbox } from "@crm/ui/components/checkbox";
 import {
 	Table,
 	TableBody,
@@ -91,6 +92,9 @@ export type DataTableProps<TRow, TSub> = {
 	expandable?: DataTableExpandable<TRow, TSub>;
 	actions?: ReactNode;
 	leadingActions?: ReactNode;
+	selectedIds?: string[];
+	onSelectedChange?: (ids: string[]) => void;
+	bulkActions?: (ids: string[]) => ReactNode;
 	search?: ReactNode;
 	meta?: ReactNode;
 	empty?: ReactNode;
@@ -152,6 +156,9 @@ export function DataTable<TRow, TSub = unknown>({
 	expandable,
 	actions,
 	leadingActions,
+	selectedIds,
+	onSelectedChange,
+	bulkActions,
 	search,
 	meta,
 	empty,
@@ -171,6 +178,25 @@ export function DataTable<TRow, TSub = unknown>({
 		"hide",
 		parseAsArrayOf(parseAsString).withDefault(defaultHiddenIds),
 	);
+	const selectable = onSelectedChange != null;
+	const selected = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
+	const pageIds = useMemo(() => rows.map(getRowId), [rows, getRowId]);
+	const allOnPage = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+
+	const toggleRow = (id: string) => {
+		const next = new Set(selected);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		onSelectedChange?.([...next]);
+	};
+
+	const togglePage = () => {
+		const next = new Set(selected);
+		if (allOnPage) for (const id of pageIds) next.delete(id);
+		else for (const id of pageIds) next.add(id);
+		onSelectedChange?.([...next]);
+	};
+
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const filtersId = useId();
 
@@ -289,6 +315,21 @@ export function DataTable<TRow, TSub = unknown>({
 						</DropdownMenu>
 					)}
 
+					{selectable && selected.size > 0 && (
+						<div className="flex items-center gap-2">
+							<span className="text-muted-foreground text-sm">
+								{selected.size} selected
+							</span>
+							{bulkActions?.([...selected])}
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => onSelectedChange?.([])}
+							>
+								Clear
+							</Button>
+						</div>
+					)}
 					{leadingActions}
 
 					<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center lg:ml-auto">
@@ -429,6 +470,15 @@ export function DataTable<TRow, TSub = unknown>({
 			>
 				<TableHeader className="sticky top-0 z-10 bg-muted [&_th]:bg-muted [&_tr]:border-0 [&_tr]:shadow-[inset_0_-1px_0_var(--border)]">
 					<TableRow>
+						{selectable && (
+							<TableHead className="h-11 w-10 px-3">
+								<Checkbox
+									checked={allOnPage}
+									onCheckedChange={togglePage}
+									aria-label="Select every row on this page"
+								/>
+							</TableHead>
+						)}
 						{anyExpandable && (
 							<TableHead className="h-11 w-10 px-3">
 								<span className="sr-only">Detail</span>
@@ -521,6 +571,18 @@ export function DataTable<TRow, TSub = unknown>({
 												: undefined
 										}
 									>
+										{selectable && (
+											<TableCell
+												className="w-10 px-3 py-3"
+												onClick={(event) => event.stopPropagation()}
+											>
+												<Checkbox
+													checked={selected.has(id)}
+													onCheckedChange={() => toggleRow(id)}
+													aria-label="Select this row"
+												/>
+											</TableCell>
+										)}
 										{anyExpandable && (
 											<TableCell className="w-10 px-3 py-3 text-center text-muted-foreground">
 												{canExpand && (

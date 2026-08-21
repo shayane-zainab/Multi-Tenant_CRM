@@ -8,6 +8,7 @@ import {
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
 import { formatMoney, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CLOSING_OPTIONS } from "@/components/crm/closing-window";
 import { CompanyCell } from "@/components/crm/company-cell";
 import { DEAL_STAGE_OPTIONS } from "@/components/crm/deal-stage";
@@ -19,7 +20,9 @@ import { ListSearch } from "@/components/data-table/list-search";
 import { useTableQuery } from "@/components/data-table/use-table-query";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { BulkMove } from "./bulk-move";
 import { dealsSearchParams } from "./deals-search-params";
+import { ExportDeals } from "./export-deals";
 
 type DealRow = RouterOutputs["deals"]["list"]["rows"][number];
 
@@ -133,12 +136,14 @@ export function DealsTable() {
 	const trpc = useTRPC();
 	const prefetchRecord = usePrefetchRecord();
 	const { query, input } = useTableQuery(dealsSearchParams);
+	const [selected, setSelected] = useState<string[]>([]);
 
 	const deals = useQuery({
 		...trpc.deals.list.queryOptions(input),
 		placeholderData: (previous) => previous,
 	});
 	const users = useQuery(trpc.users.list.queryOptions());
+	const pipelines = useQuery(trpc.pipelines.list.queryOptions());
 
 	const facetCounts = deals.data?.facetCounts;
 
@@ -151,11 +156,26 @@ export function DealsTable() {
 				.filter((option) => (facetCounts?.owner?.[option.value] ?? 0) > 0),
 		},
 		{
+			id: "pipeline",
+			label: "Pipeline",
+			options: (pipelines.data ?? [])
+				.map((pipeline) => ({ value: pipeline.id, label: pipeline.name }))
+				.filter((option) => (facetCounts?.pipeline?.[option.value] ?? 0) > 0),
+		},
+		{
 			id: "stage",
 			label: "Stage",
-			options: DEAL_STAGE_OPTIONS.filter(
-				(option) => (facetCounts?.stage?.[option.value] ?? 0) > 0,
-			),
+			options: (pipelines.data ?? [])
+				.flatMap((pipeline) =>
+					pipeline.stages.map((stage) => ({
+						value: stage.id,
+						label:
+							(pipelines.data?.length ?? 0) > 1
+								? `${pipeline.name} · ${stage.name}`
+								: stage.name,
+					})),
+				)
+				.filter((option) => (facetCounts?.stage?.[option.value] ?? 0) > 0),
 		},
 		{
 			id: "closing",
@@ -190,6 +210,12 @@ export function DealsTable() {
 				],
 			}}
 			getRowId={(row) => row.id}
+			selectedIds={selected}
+			onSelectedChange={setSelected}
+			bulkActions={(ids) => (
+				<BulkMove dealIds={ids} onDone={() => setSelected([])} />
+			)}
+			actions={<ExportDeals input={input} total={deals.data?.total ?? 0} />}
 			loading={deals.isFetching}
 			onRowHover={(row) => prefetchRecord({ kind: "deal", id: row.id })}
 			onRowClick={(row) => openRecord({ kind: "deal", id: row.id })}
