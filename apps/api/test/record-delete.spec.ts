@@ -1,4 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import {
+	afterAll,
+	beforeAll,
+	describe,
+	expect,
+	it,
+	setDefaultTimeout,
+} from "bun:test";
 import { db, RecordSource } from "@crm/db";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
@@ -8,6 +15,7 @@ import { FaviconService } from "../src/companies/favicon.service";
 import { ContactsService } from "../src/contacts/contacts.service";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { EnrichmentLogService } from "../src/crm/enrichment-log.service";
+import { LeadVisibilityService } from "../src/crm/lead-visibility.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { GoogleMatchService } from "../src/google/google-match.service";
 
@@ -20,6 +28,8 @@ const email = `gone@${domain}`;
 const colleague = `stays@${domain}`;
 const userId = `user-${suffix}`;
 const orgId = "org_1";
+
+setDefaultTimeout(120_000);
 
 const stamp = new ActivityStampService(db);
 
@@ -34,7 +44,16 @@ const log = new EnrichmentLogService(db, stamp);
 const queue = new AgentQueueService(db);
 const conversion = new ConversionService(db);
 
-const contacts = new ContactsService(db, directory, agent, queue, stamp);
+const visibility = new LeadVisibilityService(db);
+
+const contacts = new ContactsService(
+	db,
+	directory,
+	agent,
+	queue,
+	stamp,
+	visibility,
+);
 const companies = new CompaniesService(
 	db,
 	agent,
@@ -42,6 +61,7 @@ const companies = new CompaniesService(
 	{ backfill: async () => undefined } as unknown as FaviconService,
 	stamp,
 	conversion,
+	visibility,
 );
 const match = new GoogleMatchService(db, directory, agent, log);
 

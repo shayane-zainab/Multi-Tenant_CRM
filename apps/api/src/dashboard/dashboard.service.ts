@@ -57,6 +57,7 @@ export class DashboardService {
 		const counted = this.conversion.countedWhere(base);
 
 		const [
+			openTotals,
 			openByStage,
 			openValueByStage,
 			recentDeals,
@@ -66,6 +67,11 @@ export class DashboardService {
 			recentActivity,
 			unconverted,
 		] = await Promise.all([
+			this.db.deal.aggregate({
+				where: { AND: [{ ...owned, ...OPEN_DEALS }, counted] },
+				_count: { _all: true },
+				_sum: { baseAmount: true },
+			}),
 			this.db.deal.groupBy({
 				by: ["stageId"],
 				where: { ...owned, ...OPEN_DEALS },
@@ -267,8 +273,8 @@ export class DashboardService {
 			unconverted,
 			pipeline: {
 				stages,
-				totalCents: stages.reduce((total, row) => total + row.valueCents, 0),
-				totalDeals: stages.reduce((total, row) => total + row.count, 0),
+				totalCents: toCents(openTotals._sum.baseAmount) ?? 0,
+				totalDeals: openTotals._count._all,
 			},
 			wonThisMonth,
 			wonPrevMonth,

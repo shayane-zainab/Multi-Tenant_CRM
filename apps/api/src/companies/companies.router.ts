@@ -32,7 +32,7 @@ export class CompaniesRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof companyListInput>,
 	) {
-		return this.companies.list(ctx.organizationId, input);
+		return this.companies.list(ctx.organizationId, input, ctx.user.id);
 	}
 
 	@Query({ input: companyIdInput })

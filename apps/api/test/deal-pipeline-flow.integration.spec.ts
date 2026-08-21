@@ -9,6 +9,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { db, StageKind } from "@crm/db";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
+import { LeadVisibilityService } from "../src/crm/lead-visibility.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { PipelinesService } from "../src/pipelines/pipelines.service";
@@ -23,7 +24,12 @@ const orgs = [orgA, orgB];
 
 const pipelines = new PipelinesService(db);
 const conversion = new ConversionService(db);
-const deals = new DealsService(db, new ActivityStampService(db), conversion);
+const deals = new DealsService(
+	db,
+	new ActivityStampService(db),
+	conversion,
+	new LeadVisibilityService(db),
+);
 
 let companyA = "";
 let companyB = "";

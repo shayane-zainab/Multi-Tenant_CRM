@@ -8,9 +8,14 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { LeadVisibilityService } from "../crm/lead-visibility.service";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
-import { setAgentModelInput, setResearchKeyInput } from "./settings.contracts";
+import {
+	setAgentModelInput,
+	setLeadVisibilityInput,
+	setResearchKeyInput,
+} from "./settings.contracts";
 import { SettingsService } from "./settings.service";
 
 @Router({ alias: "settings" })
@@ -18,6 +23,8 @@ import { SettingsService } from "./settings.service";
 export class SettingsRouter {
 	constructor(
 		@Inject(SettingsService) private readonly settings: SettingsService,
+		@Inject(LeadVisibilityService)
+		private readonly visibility: LeadVisibilityService,
 	) {}
 
 	@Query()
@@ -49,5 +56,26 @@ export class SettingsRouter {
 		@Input() input: z.infer<typeof setResearchKeyInput>,
 	) {
 		return this.settings.setResearchKey(organizationId, input.apiKey);
+	}
+
+	@Query()
+	async leadVisibility(@Ctx() { organizationId }: AuthedTrpcContext) {
+		return {
+			visibility: await this.visibility.setting(organizationId),
+		};
+	}
+
+	@Mutation({ input: setLeadVisibilityInput })
+	async setLeadVisibility(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof setLeadVisibilityInput>,
+	) {
+		await this.visibility.requireManager(ctx.organizationId, ctx.user.id);
+		return {
+			visibility: await this.visibility.set(
+				ctx.organizationId,
+				input.visibility,
+			),
+		};
 	}
 }

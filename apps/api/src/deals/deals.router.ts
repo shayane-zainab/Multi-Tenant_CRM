@@ -30,7 +30,7 @@ export class DealsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof dealListInput>,
 	) {
-		return this.deals.list(ctx.organizationId, input);
+		return this.deals.list(ctx.organizationId, input, ctx.user.id);
 	}
 
 	@Query({ input: dealIdInput })
@@ -80,6 +80,6 @@ export class DealsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof dealListInput>,
 	) {
-		return this.deals.exportRows(ctx.organizationId, input);
+		return this.deals.exportRows(ctx.organizationId, input, ctx.user.id);
 	}
 }

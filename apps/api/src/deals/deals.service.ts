@@ -16,6 +16,7 @@ import {
 	ActivityStampService,
 	type StampTargets,
 } from "../crm/activity-stamp.service";
+import { LeadVisibilityService } from "../crm/lead-visibility.service";
 import {
 	blankToNull,
 	decimalFromCents,
@@ -93,10 +94,19 @@ export class DealsService {
 		@InjectDatabase() private readonly db: Db,
 		private readonly stamp: ActivityStampService,
 		private readonly conversion: ConversionService,
+		private readonly visibility: LeadVisibilityService,
 	) {}
 
-	async list(organizationId: string, input: DealListInput) {
-		const where = this.buildWhere(organizationId, input);
+	async list(
+		organizationId: string,
+		input: DealListInput,
+		actingUserId: string,
+	) {
+		const scope = await this.visibility.ownerScope(
+			organizationId,
+			actingUserId,
+		);
+		const where = this.buildWhere(organizationId, input, scope);
 		const { skip, take } = paginate(input);
 
 		const openWhere = { ...where, ...OPEN_DEALS };
@@ -128,7 +138,7 @@ export class DealsService {
 					},
 				}),
 				this.db.deal.count({ where }),
-				this.facetCounts(organizationId, input),
+				this.facetCounts(organizationId, input, scope),
 				this.db.deal.aggregate({
 					where: { AND: [openWhere, this.conversion.countedWhere(base)] },
 					_sum: { baseAmount: true },
@@ -168,9 +178,13 @@ export class DealsService {
 		};
 	}
 
-	async byId(organizationId: string, id: string) {
-		const deal = await this.db.deal.findUnique({
-			where: { id },
+	async byId(organizationId: string, id: string, actingUserId?: string) {
+		const scope = actingUserId
+			? await this.visibility.ownerScope(organizationId, actingUserId)
+			: {};
+
+		const deal = await this.db.deal.findFirst({
+			where: { id, ...scope },
 			select: {
 				id: true,
 				organizationId: true,
@@ -630,11 +644,12 @@ export class DealsService {
 	private buildWhere(
 		organizationId: string,
 		input: DealListInput,
+		scope: { ownerId?: string } = {},
 	): Prisma.DealWhereInput {
-		const where: Prisma.DealWhereInput = this.searchFilter(
-			organizationId,
-			input.q,
-		);
+		const where: Prisma.DealWhereInput = {
+			...this.searchFilter(organizationId, input.q),
+			...scope,
+		};
 
 		if (input.owner !== FACET_ALL) {
 			where.ownerId =
@@ -662,8 +677,16 @@ export class DealsService {
 		return where;
 	}
 
-	async exportRows(organizationId: string, input: DealListInput) {
-		const where = this.buildWhere(organizationId, input);
+	async exportRows(
+		organizationId: string,
+		input: DealListInput,
+		actingUserId: string,
+	) {
+		const scope = await this.visibility.ownerScope(
+			organizationId,
+			actingUserId,
+		);
+		const where = this.buildWhere(organizationId, input, scope);
 
 		const rows = await this.db.deal.findMany({
 			where,
@@ -716,8 +739,15 @@ export class DealsService {
 		};
 	}
 
-	private async facetCounts(organizationId: string, input: DealListInput) {
-		const where = this.searchFilter(organizationId, input.q);
+	private async facetCounts(
+		organizationId: string,
+		input: DealListInput,
+		scope: { ownerId?: string } = {},
+	) {
+		const where = {
+			...this.searchFilter(organizationId, input.q),
+			...scope,
+		};
 
 		const [
 			owners,

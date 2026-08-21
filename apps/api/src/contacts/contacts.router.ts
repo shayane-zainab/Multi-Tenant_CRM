@@ -31,7 +31,7 @@ export class ContactsRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof contactListInput>,
 	) {
-		return this.contacts.list(ctx.organizationId, input);
+		return this.contacts.list(ctx.organizationId, input, ctx.user.id);
 	}
 
 	@Query({ input: contactIdInput })

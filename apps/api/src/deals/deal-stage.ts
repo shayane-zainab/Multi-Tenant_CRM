@@ -35,7 +35,11 @@ export function isLosingKind(kind: StageKind): boolean {
 }
 
 export const OPEN_DEALS: Prisma.DealWhereInput = {
-	pipelineStage: { kind: StageKind.OPEN },
+	NOT: {
+		pipelineStage: {
+			kind: { in: [StageKind.LEAD, StageKind.WON, StageKind.LOST] },
+		},
+	},
 };
 
 export const CLOSED_DEALS: Prisma.DealWhereInput = {

@@ -18,6 +18,7 @@ import {
 	ActivityStampService,
 	type StampTargets,
 } from "../crm/activity-stamp.service";
+import { LeadVisibilityService } from "../crm/lead-visibility.service";
 import { blankToNull, toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
@@ -96,13 +97,19 @@ export class CompaniesService {
 		private readonly favicon: FaviconService,
 		private readonly stamp: ActivityStampService,
 		private readonly conversion: ConversionService,
+		private readonly visibility: LeadVisibilityService,
 	) {}
 
 	async list(
 		organizationId: string,
 		input: CompanyListInput,
+		actingUserId: string,
 	): Promise<ListResult<CompanyRow>> {
-		const where = this.buildWhere(organizationId, input);
+		const scope = await this.visibility.ownerScope(
+			organizationId,
+			actingUserId,
+		);
+		const where = { ...this.buildWhere(organizationId, input), ...scope };
 		const { skip, take } = paginate(input);
 
 		const [rows, total, facetCounts] = await Promise.all([
@@ -170,9 +177,13 @@ export class CompaniesService {
 		};
 	}
 
-	async byId(organizationId: string, id: string) {
-		const company = await this.db.company.findUnique({
-			where: { id },
+	async byId(organizationId: string, id: string, actingUserId?: string) {
+		const scope = actingUserId
+			? await this.visibility.ownerScope(organizationId, actingUserId)
+			: {};
+
+		const company = await this.db.company.findFirst({
+			where: { id, ...scope },
 			select: {
 				id: true,
 				organizationId: true,

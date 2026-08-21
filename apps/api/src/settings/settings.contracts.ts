@@ -19,3 +19,9 @@ export const setResearchKeyInput = z.object({
 });
 
 export type SetResearchKeyInput = z.infer<typeof setResearchKeyInput>;
+
+export const setLeadVisibilityInput = z.object({
+	visibility: z.enum(["everyone", "own"]),
+});
+
+export type SetLeadVisibilityInput = z.infer<typeof setLeadVisibilityInput>;

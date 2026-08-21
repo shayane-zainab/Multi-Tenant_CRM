@@ -20,6 +20,7 @@ import {
 	ActivityStampService,
 	type StampTargets,
 } from "../crm/activity-stamp.service";
+import { LeadVisibilityService } from "../crm/lead-visibility.service";
 import {
 	blankToNull,
 	normalizeEmail,
@@ -118,13 +119,19 @@ export class ContactsService {
 		private readonly agent: AgentTriggerService,
 		private readonly queue: AgentQueueService,
 		private readonly stamp: ActivityStampService,
+		private readonly visibility: LeadVisibilityService,
 	) {}
 
 	async list(
 		organizationId: string,
 		input: ContactListInput,
+		actingUserId: string,
 	): Promise<ListResult<ContactRow>> {
-		const where = this.buildWhere(organizationId, input);
+		const scope = await this.visibility.ownerScope(
+			organizationId,
+			actingUserId,
+		);
+		const where = { ...this.buildWhere(organizationId, input), ...scope };
 		const { skip, take } = paginate(input);
 
 		const [rows, total, facetCounts] = await Promise.all([
@@ -162,9 +169,13 @@ export class ContactsService {
 		};
 	}
 
-	async byId(organizationId: string, id: string) {
-		const contact = await this.db.contact.findUnique({
-			where: { id },
+	async byId(organizationId: string, id: string, actingUserId?: string) {
+		const scope = actingUserId
+			? await this.visibility.ownerScope(organizationId, actingUserId)
+			: {};
+
+		const contact = await this.db.contact.findFirst({
+			where: { id, ...scope },
 			select: {
 				id: true,
 				organizationId: true,

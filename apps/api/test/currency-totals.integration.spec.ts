@@ -1,18 +1,33 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import {
+	afterAll,
+	beforeAll,
+	describe,
+	expect,
+	it,
+	setDefaultTimeout,
+} from "bun:test";
 import { DealStage, db, RateSource, StageKind } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
 import { writeReportingCurrency } from "@crm/db/settings";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
+import { LeadVisibilityService } from "../src/crm/lead-visibility.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DashboardService } from "../src/dashboard/dashboard.service";
 import { DealsService } from "../src/deals/deals.service";
+
+setDefaultTimeout(120_000);
 
 const suffix = process.env.TEST_RUN_ID ?? "currency-totals-spec";
 const userId = `user-${suffix}`;
 const domain = `money-${suffix}.test`;
 
 const conversion = new ConversionService(db);
-const deals = new DealsService(db, new ActivityStampService(db), conversion);
+const deals = new DealsService(
+	db,
+	new ActivityStampService(db),
+	conversion,
+	new LeadVisibilityService(db),
+);
 const dashboard = new DashboardService(db, conversion);
 
 let companyId: string;
@@ -222,18 +237,22 @@ describe("the deals list", () => {
 		await writeReportingCurrency(db, orgId, "USD");
 		await conversion.rerateAll(orgId);
 
-		const list = await deals.list(orgId, {
-			q: "",
-			page: 1,
-			pageSize: 25,
-			sort: "amount",
-			dir: "desc",
-			status: "open",
-			owner: userId,
-			stage: "all",
-			pipeline: "all",
-			closing: "all",
-		});
+		const list = await deals.list(
+			orgId,
+			{
+				q: "",
+				page: 1,
+				pageSize: 25,
+				sort: "amount",
+				dir: "desc",
+				status: "open",
+				owner: userId,
+				stage: "all",
+				pipeline: "all",
+				closing: "all",
+			},
+			userId,
+		);
 
 		expect(list.reportingCurrency).toBe("USD");
 		expect(list.unconverted.count).toBe(0);
@@ -489,6 +508,7 @@ describe("the dashboard only values what it can convert", () => {
 				companyId,
 				ownerId: analystId,
 				stage,
+				stageId: await stageIdFor(closed ? StageKind.WON : StageKind.OPEN),
 				amount: 9_000,
 				currency: "USD",
 				baseAmount: 9_000,

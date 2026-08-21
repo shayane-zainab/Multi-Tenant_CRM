@@ -22,7 +22,7 @@ import { dashboardSummaryInput } from "../dashboard/dashboard.contracts";
 import { dealListInput, dealIdInput, dealCreateInput, dealUpdateArgs, setStageInput, moveDealsInput } from "../deals/deals.contracts";
 import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInput } from "../google/google.contracts";
 import { createPipelineInput, renamePipelineInput, pipelineIdInput, addStageInput, updateStageInput, reorderStagesInput, removeStageInput } from "../pipelines/pipelines.contracts";
-import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
+import { setAgentModelInput, setResearchKeyInput, setLeadVisibilityInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
 import { connectInput, connectionInput, setWhatsAppAutoCreateInput, threadsInput, whatsAppThreadInput, sendInput } from "../whatsapp/whatsapp.contracts";
 import { memberListInput, updateWorkspaceInput, setMemberRoleInput, inviteMemberInput, revokeInvitationInput } from "../workspace/workspace.contracts";
@@ -239,7 +239,12 @@ const appRouter = t.router({
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<SettingsRouter["researchKey"]>>),
     setResearchKey: publicProcedure
       .input(setResearchKeyInput)
-      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<SettingsRouter["setResearchKey"]>>)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<SettingsRouter["setResearchKey"]>>),
+    leadVisibility: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<SettingsRouter["leadVisibility"]>>),
+    setLeadVisibility: publicProcedure
+      .input(setLeadVisibilityInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<SettingsRouter["setLeadVisibility"]>>)
     }),
   sso: t.router({
     signInOptions: publicProcedure
