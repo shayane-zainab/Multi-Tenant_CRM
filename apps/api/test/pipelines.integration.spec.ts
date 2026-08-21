@@ -18,6 +18,22 @@ const plain = `user-pipe-member-${suffix}`;
 
 setDefaultTimeout(120_000);
 
+async function refuses(
+	promise: Promise<unknown>,
+	pattern: RegExp,
+): Promise<void> {
+	let message: string | null = null;
+
+	try {
+		await promise;
+	} catch (error) {
+		message = error instanceof Error ? error.message : String(error);
+	}
+
+	expect(message).not.toBeNull();
+	expect(message ?? "").toMatch(pattern);
+}
+
 const pipelines = new PipelinesService(db);
 
 const orgs = [orgA, orgB];
@@ -126,18 +142,20 @@ describe("creating a pipeline", () => {
 	});
 
 	it("refuses a pipeline with no open stage", async () => {
-		await expect(
+		await refuses(
 			pipelines.create(orgA, admin, {
 				name: `No open ${suffix}`,
 				stages: [{ name: "Only lead", kind: StageKind.LEAD }],
 			}),
-		).rejects.toThrow(/at least one open stage/i);
+			/at least one open stage/i,
+		);
 	});
 
 	it("refuses a duplicate name in the same workspace", async () => {
-		await expect(
+		await refuses(
 			pipelines.create(orgA, admin, { name: `Real estate ${suffix}` }),
-		).rejects.toThrow(/already has a pipeline/i);
+			/already has a pipeline/i,
+		);
 	});
 
 	it("lets a different workspace reuse the same name", async () => {
@@ -149,9 +167,10 @@ describe("creating a pipeline", () => {
 	});
 
 	it("refuses somebody who is not an owner or admin", async () => {
-		await expect(
+		await refuses(
 			pipelines.create(orgA, plain, { name: `Member made ${suffix}` }),
-		).rejects.toThrow(/owner or an admin/i);
+			/owner or an admin/i,
+		);
 	});
 });
 
@@ -167,9 +186,10 @@ describe("stages keep the pipeline reportable", () => {
 
 		const open = pipeline.stages.find((s) => s.kind === StageKind.OPEN);
 
-		await expect(
+		await refuses(
 			pipelines.removeStage(orgA, admin, { stageId: open?.id ?? "" }),
-		).rejects.toThrow(/at least one open stage/i);
+			/at least one open stage/i,
+		);
 	});
 
 	it("refuses to retype the last open stage away", async () => {
@@ -183,12 +203,13 @@ describe("stages keep the pipeline reportable", () => {
 
 		const open = pipeline.stages.find((s) => s.kind === StageKind.OPEN);
 
-		await expect(
+		await refuses(
 			pipelines.updateStage(orgA, admin, {
 				stageId: open?.id ?? "",
 				kind: StageKind.LOST,
 			}),
-		).rejects.toThrow(/at least one open stage/i);
+			/at least one open stage/i,
+		);
 	});
 
 	it("reorders only when every stage is listed once", async () => {
@@ -206,12 +227,13 @@ describe("stages keep the pipeline reportable", () => {
 
 		expect(after.stages.map((s) => s.id)).toEqual(reversed);
 
-		await expect(
+		await refuses(
 			pipelines.reorderStages(orgA, admin, {
 				pipelineId: pipeline.id,
 				stageIds: ids.slice(1),
 			}),
-		).rejects.toThrow(/every stage/i);
+			/every stage/i,
+		);
 	});
 });
 
@@ -221,12 +243,13 @@ describe("one workspace cannot reach another's pipelines", () => {
 			name: `Owned by B ${suffix}`,
 		});
 
-		await expect(
+		await refuses(
 			pipelines.rename(orgA, admin, {
 				pipelineId: mine.id,
 				name: "Stolen",
 			}),
-		).rejects.toThrow(/no longer exists/i);
+			/no longer exists/i,
+		);
 	});
 
 	it("refuses to add a stage to a pipeline it does not own", async () => {
@@ -234,13 +257,14 @@ describe("one workspace cannot reach another's pipelines", () => {
 			name: `Also owned by B ${suffix}`,
 		});
 
-		await expect(
+		await refuses(
 			pipelines.addStage(orgA, admin, {
 				pipelineId: mine.id,
 				name: "Sneaky",
 				kind: StageKind.OPEN,
 			}),
-		).rejects.toThrow(/no longer exists/i);
+			/no longer exists/i,
+		);
 	});
 
 	it("lists only its own pipelines", async () => {
