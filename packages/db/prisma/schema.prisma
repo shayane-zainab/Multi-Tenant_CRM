@@ -110,6 +110,13 @@ enum DealStage {
   CLOSED_LOST
 }
 
+enum StageKind {
+  LEAD
+  OPEN
+  WON
+  LOST
+}
+
 enum ActivityType {
   NOTE
   CALL
@@ -427,6 +434,10 @@ model Deal {
   owner         User                @relation("DealOwner", fields: [ownerId], references: [id])
 
   stage             DealStage @default(DEMO_BOOKED)
+  pipelineId        String?
+  pipeline          Pipeline?      @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  stageId           String?
+  pipelineStage     PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
   stageChangedAt    DateTime  @default(now())
   amount            Decimal?  @db.Decimal(14, 2)
   currency          String    @default("USD")
@@ -456,7 +467,45 @@ model Deal {
   @@index([baseAmount])
   @@index([currency])
   @@index([organizationId])
+  @@index([pipelineId])
+  @@index([stageId])
   @@map("deal")
+}
+
+model Pipeline {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  position       Int           @default(0)
+  isDefault      Boolean       @default(false)
+  archivedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  stages PipelineStage[]
+  deals  Deal[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("pipeline")
+}
+
+model PipelineStage {
+  id         String    @id @default(cuid())
+  pipelineId String
+  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name       String
+  kind       StageKind @default(OPEN)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  deals Deal[]
+
+  @@unique([pipelineId, name])
+  @@index([pipelineId])
+  @@map("pipeline_stage")
 }
 
 enum RateSource {
@@ -876,6 +925,7 @@ model Organization {
   suppressedPhones   SuppressedPhone[]
   orgSettings        OrgSetting[]
   workspaceProfiles  WorkspaceProfile[]
+  pipelines          Pipeline[]
   members            Member[]
   invitations        Invitation[]
 
