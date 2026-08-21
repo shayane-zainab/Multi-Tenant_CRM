@@ -1,5 +1,6 @@
 import type { Db } from "@crm/db";
 import { Injectable } from "@nestjs/common";
+import { LeadVisibilityService } from "../crm/lead-visibility.service";
 import { InjectDatabase } from "../database/database.constants";
 
 export type SearchHit = {
@@ -17,19 +18,29 @@ const PER_KIND = 5;
 
 @Injectable()
 export class SearchService {
-	constructor(@InjectDatabase() private readonly db: Db) {}
+	constructor(
+		@InjectDatabase() private readonly db: Db,
+		private readonly visibility: LeadVisibilityService,
+	) {}
 
 	async quick(
 		organizationId: string,
 		q: string,
+		actingUserId: string,
 	): Promise<{ hits: SearchHit[] }> {
 		const term = q.trim();
 		if (term.length < 2) return { hits: [] };
+
+		const scope = await this.visibility.ownerScope(
+			organizationId,
+			actingUserId,
+		);
 
 		const [companies, contacts, deals] = await Promise.all([
 			this.db.company.findMany({
 				where: {
 					organizationId,
+					...scope,
 					OR: [
 						{ name: { contains: term, mode: "insensitive" } },
 						{ domain: { contains: term, mode: "insensitive" } },
@@ -49,6 +60,7 @@ export class SearchService {
 			this.db.contact.findMany({
 				where: {
 					organizationId,
+					...scope,
 					OR: [
 						{ firstName: { contains: term, mode: "insensitive" } },
 						{ lastName: { contains: term, mode: "insensitive" } },
@@ -69,6 +81,7 @@ export class SearchService {
 			this.db.deal.findMany({
 				where: {
 					organizationId,
+					...scope,
 					name: { contains: term, mode: "insensitive" },
 				},
 				take: PER_KIND,

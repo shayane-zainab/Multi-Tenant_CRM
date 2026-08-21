@@ -1,5 +1,6 @@
 import { ActivityType, type Db, DealStage, StageKind } from "@crm/db";
 import { Injectable } from "@nestjs/common";
+import { LeadVisibilityService } from "../crm/lead-visibility.service";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
@@ -34,6 +35,7 @@ export class DashboardService {
 	constructor(
 		@InjectDatabase() private readonly db: Db,
 		private readonly conversion: ConversionService,
+		private readonly visibility: LeadVisibilityService,
 	) {}
 
 	async summary(
@@ -42,9 +44,15 @@ export class DashboardService {
 		input: DashboardSummaryInput,
 	) {
 		const mine = input.scope === "me";
-		const owned = mine
-			? { organizationId, ownerId: actingUserId }
-			: { organizationId };
+		const restricted = await this.visibility.restrictedTo(
+			organizationId,
+			actingUserId,
+		);
+
+		const owned =
+			mine || restricted
+				? { organizationId, ownerId: restricted ?? actingUserId }
+				: { organizationId };
 
 		const now = new Date();
 		const startOfMonth = monthStart(now, 0);

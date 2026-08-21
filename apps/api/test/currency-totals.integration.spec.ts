@@ -28,7 +28,11 @@ const deals = new DealsService(
 	conversion,
 	new LeadVisibilityService(db),
 );
-const dashboard = new DashboardService(db, conversion);
+const dashboard = new DashboardService(
+	db,
+	conversion,
+	new LeadVisibilityService(db),
+);
 
 let companyId: string;
 let previousReportingCurrency: string | null = null;

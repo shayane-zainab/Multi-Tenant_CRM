@@ -239,6 +239,7 @@ export class CompaniesService {
 					},
 				},
 				deals: {
+					where: scope,
 					orderBy: [{ stage: "asc" }, { expectedCloseDate: "asc" }],
 					select: {
 						id: true,

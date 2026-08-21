@@ -14,6 +14,6 @@ export class SearchRouter {
 
 	@Query({ input: quickInput })
 	async quick(@Ctx() ctx: AuthedTrpcContext, @Input("q") q: string) {
-		return this.search.quick(ctx.organizationId, q);
+		return this.search.quick(ctx.organizationId, q, ctx.user.id);
 	}
 }

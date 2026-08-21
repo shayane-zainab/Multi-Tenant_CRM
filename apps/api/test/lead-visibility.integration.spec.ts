@@ -7,11 +7,13 @@ import {
 	setDefaultTimeout,
 } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { db } from "@crm/db";
+import { db, StageKind } from "@crm/db";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { LeadVisibilityService } from "../src/crm/lead-visibility.service";
 import { ConversionService } from "../src/currency/conversion.service";
+import { DashboardService } from "../src/dashboard/dashboard.service";
 import { DealsService } from "../src/deals/deals.service";
+import { SearchService } from "../src/search/search.service";
 
 setDefaultTimeout(180_000);
 
@@ -26,6 +28,13 @@ const visibility = new LeadVisibilityService(db);
 const deals = new DealsService(
 	db,
 	new ActivityStampService(db),
+	new ConversionService(db),
+	visibility,
+);
+
+const search = new SearchService(db, visibility);
+const dashboard = new DashboardService(
+	db,
 	new ConversionService(db),
 	visibility,
 );
@@ -122,6 +131,18 @@ beforeAll(async () => {
 			amountCents: 1_000,
 		});
 	}
+
+	const open = await db.pipelineStage.findFirst({
+		where: { kind: StageKind.OPEN, pipeline: { organizationId: org } },
+		select: { id: true, pipelineId: true },
+	});
+
+	if (!open) throw new Error("the default pipeline has no open stage");
+
+	await db.deal.updateMany({
+		where: { organizationId: org },
+		data: { stageId: open.id, pipelineId: open.pipelineId },
+	});
 });
 
 afterAll(async () => {
@@ -204,6 +225,26 @@ describe("when leads are private", () => {
 		}
 
 		expect(message).toMatch(/owner or an admin/i);
+	});
+
+	it("keeps another rep's leads out of global search", async () => {
+		const found = await search.quick(org, "Lead of", repA);
+		const deals = found.hits.filter((hit) => hit.kind === "deal");
+
+		expect(deals).toHaveLength(1);
+		expect(deals[0]?.label).toContain("Lead of A");
+	});
+
+	it("keeps the dashboard to a rep's own leads even asking for everyone", async () => {
+		const summary = await dashboard.summary(org, repA, { scope: "everyone" });
+
+		expect(summary.pipeline.totalDeals).toBe(1);
+	});
+
+	it("still shows an owner the whole dashboard", async () => {
+		const summary = await dashboard.summary(org, owner, { scope: "everyone" });
+
+		expect(summary.pipeline.totalDeals).toBe(2);
 	});
 
 	it("goes back to shared when switched off", async () => {
