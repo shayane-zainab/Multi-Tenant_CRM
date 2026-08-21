@@ -74,4 +74,12 @@ export class DealsRouter {
 	) {
 		return this.deals.moveMany(ctx.organizationId, input, ctx.user.id);
 	}
+
+	@Query({ input: dealListInput })
+	async exportRows(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof dealListInput>,
+	) {
+		return this.deals.exportRows(ctx.organizationId, input);
+	}
 }

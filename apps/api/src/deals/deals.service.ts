@@ -49,6 +49,8 @@ import type {
 } from "./deals.contracts";
 import { CLOSING_WINDOWS } from "./deals.contracts";
 
+const EXPORT_LIMIT = 5000;
+
 const OWNER_SELECT = {
 	id: true,
 	name: true,
@@ -658,6 +660,60 @@ export class DealsService {
 		}
 
 		return where;
+	}
+
+	async exportRows(organizationId: string, input: DealListInput) {
+		const where = this.buildWhere(organizationId, input);
+
+		const rows = await this.db.deal.findMany({
+			where,
+			orderBy: resolveOrderBy(input, SORTABLE, [{ createdAt: "desc" }]),
+			take: EXPORT_LIMIT,
+			select: {
+				id: true,
+				name: true,
+				amount: true,
+				currency: true,
+				baseAmount: true,
+				expectedCloseDate: true,
+				closedAt: true,
+				closedReason: true,
+				createdAt: true,
+				lastActivityAt: true,
+				company: {
+					select: { name: true, domain: true, industry: true, country: true },
+				},
+				owner: { select: { name: true, email: true } },
+				pipeline: { select: { name: true } },
+				pipelineStage: { select: { name: true, kind: true } },
+			},
+		});
+
+		return {
+			reportingCurrency:
+				await this.conversion.reportingCurrency(organizationId),
+			truncated: rows.length === EXPORT_LIMIT,
+			rows: rows.map((row) => ({
+				name: row.name,
+				company: row.company?.name ?? "",
+				domain: row.company?.domain ?? "",
+				industry: row.company?.industry ?? "",
+				country: row.company?.country ?? "",
+				pipeline: row.pipeline?.name ?? "",
+				stage: row.pipelineStage?.name ?? "",
+				stageKind: row.pipelineStage?.kind ?? "",
+				owner: row.owner?.name ?? "",
+				ownerEmail: row.owner?.email ?? "",
+				amount: row.amount?.toString() ?? "",
+				currency: row.currency,
+				baseAmount: row.baseAmount?.toString() ?? "",
+				expectedCloseDate: row.expectedCloseDate?.toISOString() ?? "",
+				closedAt: row.closedAt?.toISOString() ?? "",
+				closedReason: row.closedReason ?? "",
+				lastActivityAt: row.lastActivityAt?.toISOString() ?? "",
+				createdAt: row.createdAt.toISOString(),
+			})),
+		};
 	}
 
 	private async facetCounts(organizationId: string, input: DealListInput) {
