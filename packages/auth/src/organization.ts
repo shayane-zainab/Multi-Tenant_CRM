@@ -66,6 +66,25 @@ async function claimInvitation(userId: string): Promise<string | undefined> {
 
 	if (!invitation) return undefined;
 
+	const already = await db.member.findUnique({
+		where: {
+			organizationId_userId: {
+				organizationId: invitation.organizationId,
+				userId,
+			},
+		},
+		select: { id: true },
+	});
+
+	if (already) {
+		await db.invitation.update({
+			where: { id: invitation.id },
+			data: { status: "accepted" },
+		});
+
+		return invitation.organizationId;
+	}
+
 	try {
 		await db.$transaction([
 			db.member.create({
@@ -87,18 +106,18 @@ async function claimInvitation(userId: string): Promise<string | undefined> {
 
 		return invitation.organizationId;
 	} catch {
-		return await findMembership(userId);
+		return invitation.organizationId;
 	}
 }
 
 export async function ensureOrganizationMembership(
 	userId: string,
 ): Promise<string | undefined> {
-	const existing = await findMembership(userId);
-	if (existing) return existing;
-
 	const invited = await claimInvitation(userId);
 	if (invited) return invited;
+
+	const existing = await findMembership(userId);
+	if (existing) return existing;
 
 	const base = workspaceSlug(DEFAULT_WORKSPACE_NAME);
 

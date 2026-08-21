@@ -162,12 +162,53 @@ describe("an invitation that should not be honoured", () => {
 		expect(organizationId).not.toBe(inviterOrg);
 	});
 
-	it("leaves an existing member where they already are", async () => {
-		await ensureOrganizationMembership(joinerId);
-		const first = await ensureOrganizationMembership(joinerId);
+	it("claims an invitation even when they already have a workspace", async () => {
+		const own = await ensureOrganizationMembership(joinerId);
+		expect(own).not.toBe(inviterOrg);
 
 		await invite(joinerEmail, new Date(Date.now() + 60_000));
 
-		expect(await ensureOrganizationMembership(joinerId)).toBe(first);
+		expect(await ensureOrganizationMembership(joinerId)).toBe(inviterOrg);
+
+		const joined = await db.member.findUnique({
+			where: {
+				organizationId_userId: {
+					organizationId: inviterOrg,
+					userId: joinerId,
+				},
+			},
+			select: { role: true },
+		});
+
+		expect(joined).not.toBeNull();
+	});
+
+	it("leaves a member alone when no invitation is waiting", async () => {
+		const own = await ensureOrganizationMembership(joinerId);
+
+		expect(await ensureOrganizationMembership(joinerId)).toBe(own);
+	});
+
+	it("accepts an invitation to a workspace they are already in", async () => {
+		await db.member.create({
+			data: {
+				id: randomUUID(),
+				organizationId: inviterOrg,
+				userId: joinerId,
+				role: "member",
+				createdAt: new Date(),
+			},
+		});
+
+		const created = await invite(joinerEmail, new Date(Date.now() + 60_000));
+
+		expect(await ensureOrganizationMembership(joinerId)).toBe(inviterOrg);
+
+		const after = await db.invitation.findUnique({
+			where: { id: created.id },
+			select: { status: true },
+		});
+
+		expect(after?.status).toBe("accepted");
 	});
 });
