@@ -110,7 +110,9 @@ async function readRawBody(request: Request): Promise<Buffer> {
 	let size = 0;
 
 	for await (const chunk of request) {
-		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+		const buffer = Buffer.isBuffer(chunk)
+			? chunk
+			: Buffer.from(chunk as string);
 		size += buffer.length;
 
 		if (size > MAX_WEBHOOK_BYTES) {
